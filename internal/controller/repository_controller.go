@@ -85,6 +85,13 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 func (r *RepositoryReconciler) deleteRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+	l.Info("clear finalizer")
+	controllerutil.RemoveFinalizer(repo, finalizer)
+	err := r.Update(ctx, repo)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

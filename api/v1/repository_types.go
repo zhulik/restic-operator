@@ -34,7 +34,7 @@ type RepositorySpec struct {
 	// URL is the URL of the repository
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	URL string `json:"url"`
+	Repository string `json:"repository"`
 
 	// Keys is the map of keys to use for the repository.
 	// Key named "main" must be present and will be used to initialize the repository.
@@ -72,6 +72,7 @@ type RepositoryStatus struct {
 	// +optional
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	ObservedSpec       RepositorySpec     `json:"observedSpec,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -98,13 +98,13 @@ spec:
                   Key named "main" must be present and will be used to initialize the repository.
                 minProperties: 1
                 type: object
-              url:
+              repository:
                 description: URL is the URL of the repository
                 minLength: 1
                 type: string
             required:
             - keys
-            - url
+            - repository
             type: object
           status:
             description: status defines the observed state of Repository
@@ -178,6 +178,81 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              observedGeneration:
+                format: int64
+                type: integer
+              observedSpec:
+                description: RepositorySpec defines the desired state of Repository
+                properties:
+                  env:
+                    additionalProperties:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    description: |-
+                      Env is the map of environment variables to use when initializing the repository.
+                      For instance, the s3 backend requires at least the following environment variables:
+                      - AWS_ACCESS_KEY_ID
+                      - AWS_SECRET_ACCESS_KEY
+                    type: object
+                  keys:
+                    additionalProperties:
+                      description: SecretKeySelector selects a key of a Secret.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    description: |-
+                      Keys is the map of keys to use for the repository.
+                      Key named "main" must be present and will be used to initialize the repository.
+                    minProperties: 1
+                    type: object
+                  repository:
+                    description: URL is the URL of the repository
+                    minLength: 1
+                    type: string
+                required:
+                - keys
+                - repository
+                type: object
             type: object
         required:
         - spec
