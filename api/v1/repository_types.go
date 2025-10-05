@@ -40,7 +40,7 @@ type RepositorySpec struct {
 	// Key named "main" must be present and will be used to initialize the repository.
 	// +required
 	// +kubebuilder:validation:MinProperties=1
-	Keys map[string]corev1.SecretKeySelector `json:"keys"`
+	Keys map[string]ResticKey `json:"keys"`
 
 	// Env is the map of environment variables to use when initializing the repository.
 	// For instance, the s3 backend requires at least the following environment variables:
@@ -59,6 +59,19 @@ type RepositorySpec struct {
 	// match the existing repository.
 	// +optional
 	Import *bool `json:"import,omitempty"`
+}
+
+type ResticKey struct {
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	User string `json:"user"`
+
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Host string `json:"host"`
+
+	// +required
+	Key corev1.SecretKeySelector `json:"key"`
 }
 
 // RepositoryStatus defines the observed state of Repository.
