@@ -48,6 +48,10 @@ type RepositorySpec struct {
 	// - AWS_SECRET_ACCESS_KEY
 	// +optional
 	Env map[string]corev1.SecretKeySelector `json:"env"`
+
+	// Version is the version of restic to use. Leave it empty to use the latest version.
+	// +optional
+	Version *string `json:"version,omitempty"`
 }
 
 // RepositoryStatus defines the observed state of Repository.
