@@ -5,5 +5,19 @@ metadata:
     app.kubernetes.io/name: restic-operator
     app.kubernetes.io/managed-by: kustomize
   name: repository-sample
+
 spec:
-  # TODO(user): Add fields here
+  url: s3:https://s3.eu-central-1.amazonaws.com/restic-operator-test
+
+  keys:
+    main:
+      name: restic-operator-test
+      key: password
+
+  env:
+    AWS_ACCESS_KEY_ID:
+      name: restic-operator-test
+      key: aws-access-key-id
+    AWS_SECRET_ACCESS_KEY:
+      name: restic-operator-test
+      key: aws-secret-access-key
