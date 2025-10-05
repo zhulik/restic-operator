@@ -1,8 +1,6 @@
 # restic-operator
-// TODO(user): Add simple overview of use/purpose
+A kubernetes operator to manager restic repositories in a declarative manner
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
 
 ## Getting Started
 
