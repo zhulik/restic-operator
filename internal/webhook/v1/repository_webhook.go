@@ -66,20 +66,32 @@ func (v *RepositoryCustomValidator) ValidateCreate(_ context.Context, obj runtim
 	}
 	repositorylog.Info("Validation for Repository upon creation", "name", repository.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
+	if _, ok := repository.Spec.Keys["main"]; !ok {
+		return nil, fmt.Errorf("main key is required, add a key named main to the keys map")
+	}
+
+	// TODO: check if all given keys are valid and not empty
 
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Repository.
 func (v *RepositoryCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	repository, ok := newObj.(*resticv1.Repository)
+	updRepo, ok := newObj.(*resticv1.Repository)
 	if !ok {
 		return nil, fmt.Errorf("expected a Repository object for the newObj but got %T", newObj)
 	}
-	repositorylog.Info("Validation for Repository upon update", "name", repository.GetName())
+	oldRepo, ok := oldObj.(*resticv1.Repository)
+	if !ok {
+		return nil, fmt.Errorf("expected a Repository object for the oldObj but got %T", oldObj)
+	}
+	repositorylog.Info("Validation for Repository upon update", "name", updRepo.GetName())
 
-	// TODO(user): fill in your validation logic upon object update.
+	if oldRepo.Spec.Repository != updRepo.Spec.Repository {
+		return nil, fmt.Errorf("repository field is immutable")
+	}
+
+	// TODO: check if all given keys are valid and not empty
 
 	return nil, nil
 }
