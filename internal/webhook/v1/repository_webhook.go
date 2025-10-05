@@ -22,9 +22,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	corev1 "k8s.io/api/core/v1"
 
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
@@ -36,7 +39,7 @@ var repositorylog = logf.Log.WithName("repository-resource")
 // SetupRepositoryWebhookWithManager registers the webhook for Repository in the manager.
 func SetupRepositoryWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&resticv1.Repository{}).
-		WithValidator(&RepositoryCustomValidator{}).
+		WithValidator(&RepositoryCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
 
@@ -53,13 +56,13 @@ func SetupRepositoryWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type RepositoryCustomValidator struct {
-	// TODO(user): Add more fields as needed for validation
+	Client client.Client
 }
 
 var _ webhook.CustomValidator = &RepositoryCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Repository.
-func (v *RepositoryCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *RepositoryCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	repository, ok := obj.(*resticv1.Repository)
 	if !ok {
 		return nil, fmt.Errorf("expected a Repository object but got %T", obj)
@@ -70,13 +73,16 @@ func (v *RepositoryCustomValidator) ValidateCreate(_ context.Context, obj runtim
 		return nil, fmt.Errorf("main key is required, add a key named main to the keys map")
 	}
 
-	// TODO: check if all given keys are valid and not empty
+	err := v.validateSecrets(ctx, repository.Namespace, repository.Spec.Keys)
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Repository.
-func (v *RepositoryCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
 	updRepo, ok := newObj.(*resticv1.Repository)
 	if !ok {
 		return nil, fmt.Errorf("expected a Repository object for the newObj but got %T", newObj)
@@ -91,7 +97,10 @@ func (v *RepositoryCustomValidator) ValidateUpdate(_ context.Context, oldObj, ne
 		return nil, fmt.Errorf("repository field is immutable")
 	}
 
-	// TODO: check if all given keys are valid and not empty
+	err := v.validateSecrets(ctx, updRepo.Namespace, updRepo.Spec.Keys)
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
@@ -107,4 +116,15 @@ func (v *RepositoryCustomValidator) ValidateDelete(ctx context.Context, obj runt
 	// TODO(user): fill in your validation logic upon object deletion.
 
 	return nil, nil
+}
+
+func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespace string, secrets map[string]corev1.SecretKeySelector) error {
+	// TODO: can be done concurrently
+	for _, secret := range secrets {
+		err := v.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secret.Name}, &corev1.Secret{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
