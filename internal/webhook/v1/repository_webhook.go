@@ -78,6 +78,11 @@ func (v *RepositoryCustomValidator) ValidateCreate(ctx context.Context, obj runt
 		return nil, err
 	}
 
+	err = v.validateVersion(ctx, repository.Spec.Version)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -106,6 +111,11 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, err
 	}
 
+	err = v.validateVersion(ctx, updRepo.Spec.Version)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -122,5 +132,14 @@ func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespa
 			return err
 		}
 	}
+	return nil
+}
+
+func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version *string) error {
+	if version == nil || *version == "" {
+		return nil
+	}
+
+	// TODO: validate version exists
 	return nil
 }

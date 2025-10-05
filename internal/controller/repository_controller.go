@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	"github.com/zhulik/restic-operator/internal/restic"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,16 +59,20 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// TODO: when create job is started, update the repository status to reflect that
+	// TODO: when update job is started, update the repository status to reflect that
+	// TODO: when reconcilliation find repo in "pending" status, check the job status and update the repository status accordingly
+
 	if repo.Status.ObservedSpec == nil {
-		err = r.createRepository(ctx, l, repo)
+		err = r.startCreateRepoJob(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	if repo.Status.ObservedGeneration != repo.GetGeneration() {
-		err = r.updateRepository(ctx, l, repo)
+		err = r.startUpdateRepoJob(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -75,12 +81,26 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *RepositoryReconciler) updateRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+func (r *RepositoryReconciler) startUpdateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
 	return nil
 }
 
-func (r *RepositoryReconciler) createRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+	job := restic.CreateJob(repo)
+
+	// Set owner reference so the job is cleaned up with the Repository
+	if err := ctrl.SetControllerReference(repo, job, r.Scheme); err != nil {
+		return err
+	}
+
+	// Create the Job in the cluster
+	if err := r.Create(ctx, job); err != nil {
+		return err
+	}
+
+	l.Info("Created repository initialization job", "job", job.Name)
 	return nil
+
 }
 
 // SetupWithManager sets up the controller with the Manager.
