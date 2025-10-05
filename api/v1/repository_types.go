@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,7 +33,14 @@ type RepositorySpec struct {
 
 	// URL is the URL of the repository
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	URL string `json:"url"`
+
+	// Keys is the map of keys to use for the repository.
+	// Key named "main" must be present and will be used to initialize the repository.
+	// +required
+	// +kubebuilder:validation:MinProperties=1
+	Keys map[string]corev1.SecretKeySelector `json:"keys"`
 }
 
 // RepositoryStatus defines the observed state of Repository.
