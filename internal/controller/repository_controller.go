@@ -22,8 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
@@ -47,11 +50,57 @@ type RepositoryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	l := logf.FromContext(ctx).WithValues("resource", req)
 
-	// TODO(user): your logic here
+	repo := &resticv1.Repository{}
+	err := r.Get(ctx, req.NamespacedName, repo)
+	if err != nil {
+		return reconcile.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !repo.DeletionTimestamp.IsZero() {
+		err := r.deleteRepository(ctx, l, repo)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(repo, finalizer) {
+		err = r.createRepository(ctx, l, repo)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
+	if repo.Status.ObservedGeneration != repo.GetGeneration() {
+		err = r.updateRepository(ctx, l, repo)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *RepositoryReconciler) deleteRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+	return nil
+}
+
+func (r *RepositoryReconciler) updateRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+	return nil
+}
+
+func (r *RepositoryReconciler) createRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
+	l.Info("add finalizer")
+	controllerutil.AddFinalizer(repo, finalizer)
+	err := r.Update(ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
