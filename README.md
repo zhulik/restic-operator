@@ -1,6 +1,5 @@
 # restic-operator
-A kubernetes operator to manager restic repositories in a declarative manner
-
+A kubernetes operator to manage [restic](https://restic.net) repositories in a declarative manner.
 
 ## Getting Started
 
