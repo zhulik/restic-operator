@@ -97,6 +97,10 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("repository field is immutable")
 	}
 
+	if updRepo.Spec.Import != nil && *updRepo.Spec.Import {
+		return nil, fmt.Errorf("import field is immutable")
+	}
+
 	err := v.validateSecrets(ctx, updRepo.Namespace, updRepo.Spec.Keys)
 	if err != nil {
 		return nil, err
@@ -107,14 +111,6 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Repository.
 func (v *RepositoryCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	repository, ok := obj.(*resticv1.Repository)
-	if !ok {
-		return nil, fmt.Errorf("expected a Repository object but got %T", obj)
-	}
-	repositorylog.Info("Validation for Repository upon deletion", "name", repository.GetName())
-
-	// TODO(user): fill in your validation logic upon object deletion.
-
 	return nil, nil
 }
 

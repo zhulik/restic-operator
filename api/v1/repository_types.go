@@ -52,6 +52,13 @@ type RepositorySpec struct {
 	// Version is the version of restic to use. Leave it empty to use the latest version.
 	// +optional
 	Version *string `json:"version,omitempty"`
+
+	// Import instructs the operator to import the repository.
+	// This is useful when you want to import a repository that already exists.
+	// When this is set to true, the operator will not fail if the repository already exists and will instead check if all provided keys
+	// match the existing repository.
+	// +optional
+	Import *bool `json:"import,omitempty"`
 }
 
 // RepositoryStatus defines the observed state of Repository.
@@ -76,7 +83,7 @@ type RepositoryStatus struct {
 	// +optional
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	ObservedSpec       RepositorySpec     `json:"observedSpec,omitempty"`
+	ObservedSpec       *RepositorySpec    `json:"observedSpec,omitempty"`
 }
 
 // +kubebuilder:object:root=true

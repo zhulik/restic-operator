@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -58,15 +57,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if !repo.DeletionTimestamp.IsZero() {
-		err := r.deleteRepository(ctx, l, repo)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
-	}
-
-	if !controllerutil.ContainsFinalizer(repo, finalizer) {
+	if repo.Status.ObservedSpec == nil {
 		err = r.createRepository(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -84,29 +75,11 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *RepositoryReconciler) deleteRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	l.Info("clear finalizer")
-	controllerutil.RemoveFinalizer(repo, finalizer)
-	err := r.Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (r *RepositoryReconciler) updateRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
 	return nil
 }
 
 func (r *RepositoryReconciler) createRepository(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	l.Info("add finalizer")
-	controllerutil.AddFinalizer(repo, finalizer)
-	err := r.Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

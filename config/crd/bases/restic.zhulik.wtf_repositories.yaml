@@ -69,6 +69,13 @@ spec:
                   - AWS_ACCESS_KEY_ID
                   - AWS_SECRET_ACCESS_KEY
                 type: object
+              import:
+                description: |-
+                  Import instructs the operator to import the repository.
+                  This is useful when you want to import a repository that already exists.
+                  When this is set to true, the operator will not fail if the repository already exists and will instead check if all provided keys
+                  match the existing repository.
+                type: boolean
               keys:
                 additionalProperties:
                   description: SecretKeySelector selects a key of a Secret.
@@ -219,6 +226,13 @@ spec:
                       - AWS_ACCESS_KEY_ID
                       - AWS_SECRET_ACCESS_KEY
                     type: object
+                  import:
+                    description: |-
+                      Import instructs the operator to import the repository.
+                      This is useful when you want to import a repository that already exists.
+                      When this is set to true, the operator will not fail if the repository already exists and will instead check if all provided keys
+                      match the existing repository.
+                    type: boolean
                   keys:
                     additionalProperties:
                       description: SecretKeySelector selects a key of a Secret.
