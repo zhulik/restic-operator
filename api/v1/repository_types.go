@@ -41,6 +41,13 @@ type RepositorySpec struct {
 	// +required
 	// +kubebuilder:validation:MinProperties=1
 	Keys map[string]corev1.SecretKeySelector `json:"keys"`
+
+	// Env is the map of environment variables to use when initializing the repository.
+	// For instance, the s3 backend requires at least the following environment variables:
+	// - AWS_ACCESS_KEY_ID
+	// - AWS_SECRET_ACCESS_KEY
+	// +optional
+	Env map[string]corev1.SecretKeySelector `json:"env"`
 }
 
 // RepositoryStatus defines the observed state of Repository.
