@@ -86,7 +86,7 @@ func (r *RepositoryReconciler) startUpdateRepoJob(ctx context.Context, l logr.Lo
 }
 
 func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	job, err := restic.CreateJob(repo)
+	job, err := restic.CreateJob(repo, "init")
 	if err != nil {
 		return err
 	}

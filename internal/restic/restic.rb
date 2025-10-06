@@ -90,7 +90,7 @@ class Restic
     end
 end
 
-case ARGV[0]
+case ENV["COMMAND"]
 when "init"
     puts Restic.new(ENV).init!
 else

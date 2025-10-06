@@ -12,13 +12,13 @@ import (
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
-func CreateJob(repo *resticv1.Repository) (*batchv1.Job, error) {
+func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) {
 	image := "restic/restic"
 	if repo.Spec.Version != nil && *repo.Spec.Version != "" {
 		image += ":" + *repo.Spec.Version
 	}
 
-	env, err := jobEnv(repo)
+	env, err := jobEnv(repo, command)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job environment variables: %w", err)
 	}
@@ -53,7 +53,7 @@ func CreateJob(repo *resticv1.Repository) (*batchv1.Job, error) {
 	}, nil
 }
 
-func jobEnv(repo *resticv1.Repository) ([]corev1.EnvVar, error) {
+func jobEnv(repo *resticv1.Repository, command string) ([]corev1.EnvVar, error) {
 	mapping, err := json.Marshal(repo.Status.KeyMapping)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal key mapping: %w", err)
@@ -67,6 +67,10 @@ func jobEnv(repo *resticv1.Repository) ([]corev1.EnvVar, error) {
 		{
 			Name:  "RESTIC_KEY_MAPPING",
 			Value: string(mapping),
+		},
+		{
+			Name:  "COMMAND",
+			Value: command,
 		},
 	}
 
