@@ -102,7 +102,7 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("repository field is immutable")
 	}
 
-	if updRepo.Spec.Import != nil && *updRepo.Spec.Import {
+	if oldRepo.Spec.Import != updRepo.Spec.Import {
 		return nil, fmt.Errorf("import field is immutable")
 	}
 
@@ -135,8 +135,8 @@ func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespa
 	return nil
 }
 
-func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version *string) error {
-	if version == nil || *version == "" {
+func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version string) error {
+	if version == "" {
 		return nil
 	}
 

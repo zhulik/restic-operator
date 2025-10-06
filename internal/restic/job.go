@@ -12,11 +12,18 @@ import (
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
+const (
+	Image     = "restic/restic"
+	LatestTag = "latest"
+)
+
 func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) {
-	image := "restic/restic"
-	if repo.Spec.Version != nil && *repo.Spec.Version != "" {
-		image += ":" + *repo.Spec.Version
+	image := Image
+	tag := LatestTag
+	if repo.Spec.Version != "" {
+		tag = repo.Spec.Version
 	}
+	image += ":" + tag
 
 	env, err := jobEnv(repo, command)
 	if err != nil {
@@ -72,15 +79,13 @@ func jobEnv(repo *resticv1.Repository, command string) ([]corev1.EnvVar, error) 
 			Name:  "COMMAND",
 			Value: command,
 		},
-	}
-
-	if repo.Spec.Import != nil && *repo.Spec.Import {
-		envVars = append(envVars, corev1.EnvVar{
+		{
 			Name:  "RESTIC_IMPORT",
-			Value: strconv.FormatBool(*repo.Spec.Import),
-		})
+			Value: strconv.FormatBool(repo.Spec.Import),
+		},
 	}
 
+	// TODO: mount secrets as volumes instead of using environment variables
 	for k, v := range repo.Spec.Env {
 		envVars = append(envVars, corev1.EnvVar{
 			Name: fmt.Sprintf("RESTIC_KEY_%s", k),

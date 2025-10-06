@@ -203,6 +203,10 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              keyMapping:
+                additionalProperties:
+                  type: string
+                type: object
               observedGeneration:
                 format: int64
                 type: integer
