@@ -1,6 +1,7 @@
 package restic
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -11,10 +12,15 @@ import (
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
-func CreateJob(repo *resticv1.Repository) *batchv1.Job {
+func CreateJob(repo *resticv1.Repository) (*batchv1.Job, error) {
 	image := "restic/restic"
 	if repo.Spec.Version != nil && *repo.Spec.Version != "" {
 		image += ":" + *repo.Spec.Version
+	}
+
+	env, err := jobEnv(repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job environment variables: %w", err)
 	}
 
 	// Create a Kubernetes Job to initialize the repository.
@@ -34,27 +40,33 @@ func CreateJob(repo *resticv1.Repository) *batchv1.Job {
 					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Containers: []corev1.Container{
 						{
-							Name:  "restic-init",
-							Image: image,
-							Command: []string{
-								"restic",
-								"init",
-								"--json",
-							},
-							Env: jobEnv(repo),
+							Name:    "restic-init",
+							Image:   image,
+							Command: []string{"/bin/sh", "-c", runScript},
+							Args:    []string{resticScript},
+							Env:     env,
 						},
 					},
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func jobEnv(repo *resticv1.Repository) []corev1.EnvVar {
+func jobEnv(repo *resticv1.Repository) ([]corev1.EnvVar, error) {
+	mapping, err := json.Marshal(repo.Status.KeyMapping)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal key mapping: %w", err)
+	}
+
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "RESTIC_REPOSITORY",
 			Value: repo.Spec.Repository,
+		},
+		{
+			Name:  "RESTIC_KEY_MAPPING",
+			Value: string(mapping),
 		},
 	}
 
@@ -85,12 +97,12 @@ func jobEnv(repo *resticv1.Repository) []corev1.EnvVar {
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: mainKey.Name,
+						Name: mainKey.Key.Name,
 					},
-					Key: mainKey.Key,
+					Key: mainKey.Key.Key,
 				},
 			},
 		})
 	}
-	return envVars
+	return envVars, nil
 }

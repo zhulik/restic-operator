@@ -86,7 +86,10 @@ func (r *RepositoryReconciler) startUpdateRepoJob(ctx context.Context, l logr.Lo
 }
 
 func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	job := restic.CreateJob(repo)
+	job, err := restic.CreateJob(repo)
+	if err != nil {
+		return err
+	}
 
 	// Set owner reference so the job is cleaned up with the Repository
 	if err := ctrl.SetControllerReference(repo, job, r.Scheme); err != nil {

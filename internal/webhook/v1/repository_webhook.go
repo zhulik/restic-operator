@@ -124,10 +124,10 @@ func (v *RepositoryCustomValidator) ValidateDelete(ctx context.Context, obj runt
 	return nil, nil
 }
 
-func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespace string, secrets map[string]corev1.SecretKeySelector) error {
+func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespace string, secrets map[string]resticv1.ResticKey) error {
 	// TODO: can be done concurrently
 	for _, secret := range secrets {
-		err := v.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secret.Name}, &corev1.Secret{})
+		err := v.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secret.Key.Name}, &corev1.Secret{})
 		if err != nil {
 			return err
 		}

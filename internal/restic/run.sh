@@ -2,6 +2,6 @@
 
 set -eu
 
-apk add ruby
+apk add ruby &&
 
 ruby -e "$1"
