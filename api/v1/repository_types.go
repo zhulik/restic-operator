@@ -103,6 +103,9 @@ type RepositoryStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
+// +kubebuilder:printcolumn:name="Status",type=string,description="status",JSONPath=`.status.conditions[0].type`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Repository is the Schema for the repositories API
 type Repository struct {

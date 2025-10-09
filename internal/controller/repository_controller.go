@@ -86,8 +86,8 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return reconcile.Result{}, nil
 			}
 
-			if condition.Type == "Failed" {
-				l.Info("Repo is in failed state, giving up")
+			if condition.Type == "Failed" || condition.Type == "Created" {
+				l.Info(fmt.Sprintf("Repo is in %s state, job is done.", condition.Type))
 				return reconcile.Result{}, nil
 			}
 		}
@@ -145,6 +145,43 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			if err != nil {
 				return false, err
 			}
+			return true, nil
+		}
+
+		if condition.Type == "Completed" && condition.Status == v1.ConditionTrue {
+			logs, err := r.getJobPodLogs(ctx, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			keyMapping := map[string]string{}
+			err = json.Unmarshal([]byte(logs), &keyMapping)
+			if err != nil {
+				return false, err
+			}
+
+			repo.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Created",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryInitializationJobCompleted",
+					Message:            "Repository initialization job successfully completed",
+				},
+			}
+
+			repo.Status.KeyMapping = keyMapping
+			repo.Status.CreateJobName = nil
+
+			gen := repo.GetGeneration()
+			repo.Status.ObservedGeneration = &gen
+			repo.Status.ObservedSpec = &repo.Spec
+
+			err = r.Status().Update(ctx, repo)
+			if err != nil {
+				return false, err
+			}
+
 			return true, nil
 		}
 	}
