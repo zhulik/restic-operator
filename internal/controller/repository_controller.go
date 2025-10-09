@@ -239,7 +239,7 @@ func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RepositoryReconciler) getJobPodLogs(ctx context.Context, l logr.Logger, job *batchv1.Job) (string, error) {
+func (r *RepositoryReconciler) getJobPodLogs(ctx context.Context, _ logr.Logger, job *batchv1.Job) (string, error) {
 	container := job.Spec.Template.Spec.Containers[0]
 
 	clientset, err := kubernetes.NewForConfig(r.Config)
@@ -267,7 +267,7 @@ func (r *RepositoryReconciler) getJobPodLogs(ctx context.Context, l logr.Logger,
 	if err != nil {
 		return "", fmt.Errorf("failed to stream logs from pod %s: %w", pod.Name, err)
 	}
-	defer stream.Close()
+	defer stream.Close() // nolint:errcheck
 
 	logs, err := io.ReadAll(stream)
 	if err != nil {

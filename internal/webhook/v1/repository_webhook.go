@@ -135,7 +135,8 @@ func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespa
 	return nil
 }
 
-func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version string) error {
+// nolint:unparam
+func (v *RepositoryCustomValidator) validateVersion(_ context.Context, version string) error {
 	if version == "" {
 		return nil
 	}
