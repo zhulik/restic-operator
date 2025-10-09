@@ -124,6 +124,16 @@ func (in *RepositoryStatus) DeepCopyInto(out *RepositoryStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.CreateJobName != nil {
+		in, out := &in.CreateJobName, &out.CreateJobName
+		*out = new(string)
+		**out = **in
+	}
+	if in.ObservedGeneration != nil {
+		in, out := &in.ObservedGeneration, &out.ObservedGeneration
+		*out = new(int64)
+		**out = **in
+	}
 	if in.ObservedSpec != nil {
 		in, out := &in.ObservedSpec, &out.ObservedSpec
 		*out = new(RepositorySpec)

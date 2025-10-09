@@ -238,3 +238,8 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $$(realpath $(1)-$(3)) $(1)
 endef
+
+.PHONY: docker-build-restic
+docker-build-restic:
+	$(CONTAINER_TOOL) build -t zhulik/restic:latest -f Dockerfile.restic .
+	$(KIND) load docker-image zhulik/restic:latest

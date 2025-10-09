@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	Image     = "restic/restic"
+	Image     = "zhulik/restic"
 	LatestTag = "latest"
 )
 
@@ -31,10 +31,12 @@ func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) 
 	}
 
 	// Create a Kubernetes Job to initialize the repository.
+	var backoffLimit = int32(0)
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "init-repo-" + repo.Name,
-			Namespace: repo.Namespace,
+			GenerateName: fmt.Sprintf("init-repo-%s-", repo.Name),
+			Namespace:    repo.Namespace,
 			Labels: map[string]string{
 				"app":        "restic-repository-init",
 				"repository": repo.Name,
@@ -42,16 +44,16 @@ func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) 
 		},
 
 		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:    "restic-init",
-							Image:   image,
-							Command: []string{"/bin/sh", "-c", runScript},
-							Args:    []string{resticScript},
-							Env:     env,
+							Name:            "restic-init",
+							Image:           image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env:             env,
 						},
 					},
 				},

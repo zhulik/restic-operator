@@ -18,10 +18,18 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/zhulik/restic-operator/internal/restic"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,6 +43,7 @@ import (
 type RepositoryReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config *rest.Config
 }
 
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories,verbs=get;list;watch;create;update;patch;delete
@@ -59,19 +68,40 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// TODO: when create job is started, update the repository status to reflect that
-	// TODO: when update job is started, update the repository status to reflect that
 	// TODO: when reconcilliation find repo in "pending" status, check the job status and update the repository status accordingly
+
+	if repo.Status.Conditions != nil {
+		for _, condition := range repo.Status.Conditions {
+			if condition.Type == "Creating" {
+				l.Info("Repo is in creating state, checking job status", "job", *repo.Status.CreateJobName)
+				completed, err := r.checkCreateJobStatus(ctx, l, repo)
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+
+				if !completed {
+					return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
+				}
+
+				return reconcile.Result{}, nil
+			}
+
+			if condition.Type == "Failed" {
+				l.Info("Repo is in failed state, giving up")
+				return reconcile.Result{}, nil
+			}
+		}
+	}
 
 	if repo.Status.ObservedSpec == nil {
 		err = r.startCreateRepoJob(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+		return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
 	}
 
-	if repo.Status.ObservedGeneration != repo.GetGeneration() {
+	if repo.Status.ObservedGeneration != nil && *repo.Status.ObservedGeneration != repo.GetGeneration() {
 		err = r.startUpdateRepoJob(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -79,6 +109,47 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository) (bool, error) {
+	job := &batchv1.Job{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: *repo.Status.CreateJobName}, job)
+	if err != nil {
+		return false, err
+	}
+
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == "Failed" && condition.Status == v1.ConditionTrue {
+			logs, err := r.getJobPodLogs(ctx, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			msg := map[string]string{}
+
+			err = json.Unmarshal([]byte(logs), &msg)
+			if err != nil {
+				return false, err
+			}
+
+			repo.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Failed",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryInitializationJobFailed",
+					Message:            msg["error"],
+				},
+			}
+			err = r.Status().Update(ctx, repo)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (r *RepositoryReconciler) startUpdateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
@@ -96,14 +167,30 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 		return err
 	}
 
-	// Create the Job in the cluster
 	if err := r.Create(ctx, job); err != nil {
 		return err
 	}
 
+	repo.Status.Conditions = []metav1.Condition{
+		{
+			Type:               "Creating",
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "RepositoryInitializationStarted",
+			Message:            "Repository initialization job created",
+		},
+	}
+	repo.Status.CreateJobName = &job.Name
+
+	err = r.Status().Update(ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	l.Info("Repository status updated", "status", repo.Status)
+
 	l.Info("Created repository initialization job", "job", job.Name)
 	return nil
-
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -112,4 +199,43 @@ func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&resticv1.Repository{}).
 		Named("repository").
 		Complete(r)
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *RepositoryReconciler) getJobPodLogs(ctx context.Context, l logr.Logger, job *batchv1.Job) (string, error) {
+	container := job.Spec.Template.Spec.Containers[0]
+
+	clientset, err := kubernetes.NewForConfig(r.Config)
+	if err != nil {
+		return "", err
+	}
+
+	// Find pods created by the job using controller-runtime client
+	var podList v1.PodList
+	err = r.List(ctx, &podList,
+		client.InNamespace(job.Namespace),
+		client.MatchingLabels{"batch.kubernetes.io/job-name": job.Name})
+	if err != nil {
+		return "", fmt.Errorf("failed to list pods for job %s: %w", job.Name, err)
+	}
+
+	pod := podList.Items[0]
+
+	// Get logs using the clientset
+	req := clientset.CoreV1().Pods(job.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{
+		Container: container.Name,
+	})
+
+	stream, err := req.Stream(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to stream logs from pod %s: %w", pod.Name, err)
+	}
+	defer stream.Close()
+
+	logs, err := io.ReadAll(stream)
+	if err != nil {
+		return "", fmt.Errorf("failed to read logs from pod %s: %w", pod.Name, err)
+	}
+
+	return string(logs), nil
 }

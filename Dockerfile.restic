@@ -1,0 +1,9 @@
+FROM restic/restic:latest
+
+RUN apk add ruby --no-cache
+
+ADD internal/restic/restic.rb ./
+
+ENTRYPOINT []
+
+CMD ["ruby", "./restic.rb"]

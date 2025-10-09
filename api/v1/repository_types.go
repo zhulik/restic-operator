@@ -95,7 +95,8 @@ type RepositoryStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	CreateJobName      *string            `json:"createJobName,omitempty"`
+	ObservedGeneration *int64             `json:"observedGeneration,omitempty"`
 	ObservedSpec       *RepositorySpec    `json:"observedSpec,omitempty"`
 	KeyMapping         map[string]string  `json:"keyMapping,omitempty"`
 }

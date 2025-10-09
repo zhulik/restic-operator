@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require "json"
 require "open3"
 
@@ -23,6 +25,7 @@ class Restic
     end
 
     def init!
+
         begin
             run!("init")
         rescue ResticError => e
@@ -90,9 +93,14 @@ class Restic
     end
 end
 
-case ENV["COMMAND"]
-when "init"
-    puts Restic.new(ENV).init!
-else
-    raise "Unknown command"
+begin
+    case ENV["COMMAND"]
+    when "init"
+        puts Restic.new(ENV).init!
+    else
+        raise "Unknown command"
+    end
+rescue StandardError => e
+    puts({error: e.message}.to_json)
+    exit 1
 end

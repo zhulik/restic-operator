@@ -7,17 +7,21 @@ metadata:
   name: repository-sample
 
 spec:
-  repository: s3:https://s3.eu-central-1.amazonaws.com/restic-operator-test
+  repository: rest:http://restic-rest-server/test
 
   keys:
     main:
-      name: restic-operator-test
-      key: password
+      user: restic
+      host: restic-operator
 
-  env:
-    AWS_ACCESS_KEY_ID:
-      name: restic-operator-test
-      key: aws-access-key-id
-    AWS_SECRET_ACCESS_KEY:
-      name: restic-operator-test
-      key: aws-secret-access-key
+      key:
+        name: restic-operator-test
+        key: password
+
+  # env:
+    # AWS_ACCESS_KEY_ID:
+    #   name: restic-operator-test
+    #   key: aws-access-key-id
+    # AWS_SECRET_ACCESS_KEY:
+    #   name: restic-operator-test
+    #   key: aws-secret-access-key
