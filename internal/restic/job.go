@@ -50,7 +50,7 @@ func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job 
 
 	firstKey := repo.Status.Keys == 0
 
-	args := []string{"key", "add", "--key-file", "/key.txt"}
+	args := []string{"key", "add", "--new-password-file", "/mnt/key.txt", "--host", key.Spec.Host, "--user", key.Spec.User}
 
 	if firstKey {
 		args = append(args, "--insecure-no-password")
@@ -76,7 +76,7 @@ func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job 
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      key.SecretName(),
-									MountPath: "/key.txt",
+									MountPath: "/mnt",
 									ReadOnly:  true,
 								},
 							},

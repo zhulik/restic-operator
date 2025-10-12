@@ -14,7 +14,19 @@ spec:
     singular: key
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: repository
+      jsonPath: .spec.repository
+      name: Repository
+      type: string
+    - description: status
+      jsonPath: .status.conditions[0].type
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: Key is the Schema for the keys API

@@ -18,7 +18,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"regexp"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +37,8 @@ import (
 
 	"github.com/zhulik/restic-operator/internal/restic"
 )
+
+var keyIDRegex = regexp.MustCompile(`saved new key with ID (\w+)`)
 
 // KeyReconciler reconciles a Key object
 type KeyReconciler struct {
@@ -97,7 +99,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			}
 
 			if condition.Type == "Failed" || condition.Type == "Created" {
-				l.Info(fmt.Sprintf("Key is in %s state, job is done.", condition.Type))
 				return ctrl.Result{}, nil
 			}
 		}
@@ -112,6 +113,8 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, err
 		}
 	}
+
+	l.Info("Key ID is set, job is done")
 
 	return ctrl.Result{}, nil
 }
@@ -237,10 +240,13 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				},
 			}
 
-			key.Status.CreateJobName = nil
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return false, err
+			}
 
-			// TODO: parse logs to get the key ID
-			// key.Status.KeyID = &key.Name
+			key.Status.CreateJobName = nil
+			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
 
 			err = r.Status().Update(ctx, key)
 			if err != nil {
