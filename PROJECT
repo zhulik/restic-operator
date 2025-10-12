@@ -6,6 +6,8 @@ cliVersion: 4.9.0
 domain: zhulik.wtf
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v1-alpha: {}
 projectName: restic-operator
 repo: github.com/zhulik/restic-operator
 resources:

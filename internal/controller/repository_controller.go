@@ -227,7 +227,7 @@ func getJobPodLogs(ctx context.Context, kubeclient client.Client, config *rest.C
 	if err != nil {
 		return "", fmt.Errorf("failed to stream logs from pod %s: %w", pod.Name, err)
 	}
-	defer stream.Close()
+	defer stream.Close() // nolint:errcheck
 
 	logs, err := io.ReadAll(stream)
 	if err != nil {
