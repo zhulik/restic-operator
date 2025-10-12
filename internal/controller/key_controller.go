@@ -18,23 +18,31 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/zhulik/restic-operator/internal/restic"
 )
 
 // KeyReconciler reconciles a Key object
 type KeyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config *rest.Config
 }
 
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys,verbs=get;list;watch;create;update;patch;delete
@@ -59,14 +67,46 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// TODO: set finalizer
+
 	if key.Status.KeyID == nil {
-		l.Info("Key ID is not set, creating and assigning a key")
-		keyID, err := r.createKey(ctx, l, key)
+		l.Info("Key ID is not set")
+
+		repo := &resticv1.Repository{}
+		err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
+			}
+			return ctrl.Result{}, err
+		}
+
+		for _, condition := range key.Status.Conditions {
+			if condition.Type == "Creating" {
+				l.Info("Key is in creating state, checking job status", "job", *key.Status.CreateJobName)
+				completed, err := r.checkCreateJobStatus(ctx, l, repo, key)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				if !completed {
+					return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+				}
+
+				return ctrl.Result{}, nil
+			}
+
+			if condition.Type == "Failed" || condition.Type == "Created" {
+				l.Info(fmt.Sprintf("Key is in %s state, job is done.", condition.Type))
+				return ctrl.Result{}, nil
+			}
+		}
+
+		err = r.createKey(ctx, l, repo, key)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		key.Status.KeyID = &keyID
 		err = r.Status().Update(ctx, key)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -76,24 +116,45 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, key *resticv1.Key) (string, error) {
+func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) error {
 	err := r.createSecretIfNotExists(ctx, l, key)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	repo := &resticv1.Repository{}
-	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	job := restic.CreateAddKeyJob(repo, key)
+	if err := ctrl.SetControllerReference(key, job, r.Scheme); err != nil {
+		return err
+	}
+
+	if err := r.Create(ctx, job); err != nil {
+		return err
+	}
+
+	repo.Status.Keys++
+	err = r.Status().Update(ctx, repo)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
-		}
-		return "", err
+		return err
 	}
 
-	// TODO: set repo as owner of the key?
+	key.Status.Conditions = []metav1.Condition{
+		{
+			Type:               "Creating",
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "KeyCreationStarted",
+			Message:            "Key creation job created",
+		},
+	}
 
-	return "", nil
+	key.Status.CreateJobName = &job.Name
+	err = r.Status().Update(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	l.Info("Created key job", "job", job.Name)
+	return nil
 }
 
 func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
@@ -124,6 +185,73 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 
 	l.Info("Key secret already exists", "secret", key.SecretName())
 	return nil
+}
+
+func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) (bool, error) {
+	job := &batchv1.Job{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.CreateJobName}, job)
+	if err != nil {
+		return false, err
+	}
+
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			key.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Failed",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "KeyCreationJobFailed",
+					Message:            logs,
+				},
+			}
+
+			key.Status.CreateJobName = nil
+
+			err = r.Status().Update(ctx, key)
+			if err != nil {
+				return false, err
+			}
+
+			repo.Status.Keys--
+			err = r.Status().Update(ctx, repo)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+
+		if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
+			key.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Created",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "KeyCreationJobCompleted",
+					Message:            "Key creation job successfully completed",
+				},
+			}
+
+			key.Status.CreateJobName = nil
+
+			// TODO: parse logs to get the key ID
+			// key.Status.KeyID = &key.Name
+
+			err = r.Status().Update(ctx, key)
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

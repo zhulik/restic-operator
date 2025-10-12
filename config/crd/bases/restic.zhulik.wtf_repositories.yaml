@@ -297,6 +297,8 @@ spec:
                 x-kubernetes-list-type: map
               createJobName:
                 type: string
+              keys:
+                type: integer
             type: object
         required:
         - spec

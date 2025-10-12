@@ -23,10 +23,6 @@ func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("init-repo-%s-", repo.Name),
 			Namespace:    repo.Namespace,
-			Labels: map[string]string{
-				"app":        "restic-repository-init",
-				"repository": repo.Name,
-			},
 		},
 
 		Spec: batchv1.JobSpec{
@@ -41,6 +37,65 @@ func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             jobEnv(repo),
 							Args:            []string{"init", "--insecure-no-password"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job {
+	var backoffLimit = int32(0)
+
+	firstKey := repo.Status.Keys == 0
+
+	args := []string{"key", "add", "--key-file", "/key.txt"}
+
+	if firstKey {
+		args = append(args, "--insecure-no-password")
+	}
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("add-key-%s-%s-", repo.Name, key.Name),
+			Namespace:    repo.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:            "restic-init",
+							Image:           imageName(repo),
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env:             jobEnv(repo),
+							Args:            args,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      key.SecretName(),
+									MountPath: "/key.txt",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: key.SecretName(),
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: key.SecretName(),
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "key",
+											Path: "key.txt",
+										},
+									},
+								},
+							},
 						},
 					},
 				},

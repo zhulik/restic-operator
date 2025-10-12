@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -68,8 +67,6 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// TODO: when reconcilliation find repo in "pending" status, check the job status and update the repository status accordingly
-
 	if repo.Status.Conditions != nil {
 		for _, condition := range repo.Status.Conditions {
 			if condition.Type == "Creating" {
@@ -113,14 +110,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
-			logs, err := r.getJobPodLogs(ctx, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			msg := map[string]string{}
-
-			err = json.Unmarshal([]byte(logs), &msg)
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
 			if err != nil {
 				return false, err
 			}
@@ -131,9 +121,11 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryInitializationJobFailed",
-					Message:            msg["error"],
+					Message:            logs,
 				},
 			}
+			repo.Status.CreateJobName = nil
+			repo.Status.Keys = 0
 			err = r.Status().Update(ctx, repo)
 			if err != nil {
 				return false, err
@@ -153,7 +145,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			}
 
 			repo.Status.CreateJobName = nil
-
+			repo.Status.Keys = 0
 			err = r.Status().Update(ctx, repo)
 			if err != nil {
 				return false, err
@@ -207,17 +199,17 @@ func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RepositoryReconciler) getJobPodLogs(ctx context.Context, l logr.Logger, job *batchv1.Job) (string, error) {
-	container := job.Spec.Template.Spec.Containers[0]
-
-	clientset, err := kubernetes.NewForConfig(r.Config)
+func getJobPodLogs(ctx context.Context, kubeclient client.Client, config *rest.Config, l logr.Logger, job *batchv1.Job) (string, error) {
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return "", err
 	}
 
+	container := job.Spec.Template.Spec.Containers[0]
+
 	// Find pods created by the job using controller-runtime client
 	var podList v1.PodList
-	err = r.List(ctx, &podList,
+	err = kubeclient.List(ctx, &podList,
 		client.InNamespace(job.Namespace),
 		client.MatchingLabels{"batch.kubernetes.io/job-name": job.Name})
 	if err != nil {
