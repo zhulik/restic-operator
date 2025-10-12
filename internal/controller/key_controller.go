@@ -134,7 +134,11 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 		return err
 	}
 
-	job := restic.CreateAddKeyJob(repo, key)
+	job, err := restic.CreateAddKeyJob(ctx, r.Client, repo, key)
+	if err != nil {
+		return err
+	}
+
 	if err := ctrl.SetControllerReference(key, job, r.Scheme); err != nil {
 		return err
 	}

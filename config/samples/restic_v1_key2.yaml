@@ -1,7 +1,7 @@
 apiVersion: restic.zhulik.wtf/v1
 kind: Key
 metadata:
-  name: repository-key-sample
+  name: repository-key-sample-2
 spec:
   repository: repository-sample
   user: restic

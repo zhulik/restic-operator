@@ -23,6 +23,10 @@ spec:
       jsonPath: .status.conditions[0].type
       name: Status
       type: string
+    - description: keys
+      jsonPath: .status.keys
+      name: Keys
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date

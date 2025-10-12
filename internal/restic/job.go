@@ -1,14 +1,19 @@
 package restic
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/samber/lo"
 
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	v1 "github.com/zhulik/restic-operator/api/v1"
 )
 
 const (
@@ -45,18 +50,24 @@ func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
 	}
 }
 
-func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job {
+func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, key *resticv1.Key) (*batchv1.Job, error) {
 	var backoffLimit = int32(0)
 
 	firstKey := repo.Status.Keys == 0
 
-	args := []string{"key", "add", "--new-password-file", "/mnt/key.txt", "--host", key.Spec.Host, "--user", key.Spec.User}
+	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", key.Spec.Host, "--user", key.Spec.User}
+	env := jobEnv(repo)
 
 	if firstKey {
 		args = append(args, "--insecure-no-password")
+	} else {
+		env = append(env, corev1.EnvVar{
+			Name:  "RESTIC_PASSWORD_FILE",
+			Value: "/current-key/key.txt",
+		})
 	}
 
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("add-key-%s-%s-", repo.Name, key.Name),
 			Namespace:    repo.Namespace,
@@ -71,12 +82,12 @@ func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job 
 							Name:            "restic-init",
 							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             jobEnv(repo),
+							Env:             env,
 							Args:            args,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      key.SecretName(),
-									MountPath: "/mnt",
+									MountPath: "/new-key",
 									ReadOnly:  true,
 								},
 							},
@@ -102,6 +113,46 @@ func CreateAddKeyJob(repo *resticv1.Repository, key *resticv1.Key) *batchv1.Job 
 			},
 		},
 	}
+
+	if !firstKey {
+		var keyList v1.KeyList
+		err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
+		if err != nil {
+			return nil, err
+		}
+
+		openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
+			return lo.ContainsBy(key.ObjectMeta.OwnerReferences, func(owner metav1.OwnerReference) bool {
+				return owner.UID == repo.UID
+			})
+		})
+		if !ok {
+			panic("open key not found")
+		}
+
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: openKey.SecretName(),
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: openKey.SecretName(),
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "key",
+							Path: "key.txt",
+						},
+					},
+				},
+			},
+		})
+
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      openKey.SecretName(),
+			MountPath: "/current-key",
+			ReadOnly:  true,
+		})
+	}
+
+	return job, nil
 }
 
 func imageName(repo *resticv1.Repository) string {
