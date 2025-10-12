@@ -110,8 +110,8 @@ func (in *KeyStatus) DeepCopyInto(out *KeyStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.CreateJobName != nil {
-		in, out := &in.CreateJobName, &out.CreateJobName
+	if in.ActiveJobName != nil {
+		in, out := &in.ActiveJobName, &out.ActiveJobName
 		*out = new(string)
 		**out = **in
 	}

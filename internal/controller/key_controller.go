@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/go-logr/logr"
@@ -39,6 +40,8 @@ import (
 )
 
 var keyIDRegex = regexp.MustCompile(`saved new key with ID (\w+)`)
+
+const finalizer = "restic.zhulik.wtf/finalizer"
 
 // KeyReconciler reconciles a Key object
 type KeyReconciler struct {
@@ -69,10 +72,27 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// TODO: set finalizer
+	if !key.ObjectMeta.DeletionTimestamp.IsZero() && key.Status.ActiveJobName == nil {
+		l.Info("Key is being deleted")
+
+		err = r.deleteKey(ctx, l, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if key.ObjectMeta.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(key, finalizer) {
+		l.Info("add finalizer")
+		controllerutil.AddFinalizer(key, finalizer)
+		err = r.Update(ctx, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	if key.Status.KeyID == nil {
-		l.Info("Key ID is not set")
+		l.Info("Key ID is not set, creating a new key")
 
 		repo := &resticv1.Repository{}
 		err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
@@ -94,8 +114,22 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 		for _, condition := range key.Status.Conditions {
 			if condition.Type == "Creating" {
-				l.Info("Key is in creating state, checking job status", "job", *key.Status.CreateJobName)
+				l.Info("Key is in creating state, checking job status", "job", *key.Status.ActiveJobName)
 				completed, err := r.checkCreateJobStatus(ctx, l, repo, key)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				if !completed {
+					return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+				}
+
+				return ctrl.Result{}, nil
+			}
+
+			if condition.Type == "Deleting" {
+				l.Info("Key is in deleting state, checking job status", "job", *key.Status.ActiveJobName)
+				completed, err := r.checkDeleteJobStatus(ctx, l, key)
 				if err != nil {
 					return ctrl.Result{}, err
 				}
@@ -120,6 +154,22 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		err = r.Status().Update(ctx, key)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+	}
+
+	for _, condition := range key.Status.Conditions {
+		if condition.Type == "Deleting" {
+			l.Info("Key is in deleting state, checking job status", "job", *key.Status.ActiveJobName)
+			completed, err := r.checkDeleteJobStatus(ctx, l, key)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			if !completed {
+				return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+			}
+
+			return ctrl.Result{}, nil
 		}
 	}
 
@@ -163,13 +213,68 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 		},
 	}
 
-	key.Status.CreateJobName = &job.Name
+	key.Status.ActiveJobName = &job.Name
 	err = r.Status().Update(ctx, key)
 	if err != nil {
 		return err
 	}
 
-	l.Info("Created key job", "job", job.Name)
+	l.Info("Created key creation job", "job", job.Name)
+	return nil
+}
+
+func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
+	repo := &resticv1.Repository{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		// If the repository is not found, we consider the key already deleted
+		controllerutil.RemoveFinalizer(key, finalizer)
+		if err := r.Update(ctx, key); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	job, err := restic.CreateDeleteKeyJob(ctx, r.Client, repo, key)
+	if err != nil {
+		return err
+	}
+
+	if err := ctrl.SetControllerReference(key, job, r.Scheme); err != nil {
+		return err
+	}
+
+	if err := r.Create(ctx, job); err != nil {
+		return err
+	}
+
+	repo.Status.Keys--
+	err = r.Status().Update(ctx, repo)
+	if err != nil {
+		return err
+	}
+
+	key.Status.Conditions = []metav1.Condition{
+		{
+			Type:               "Deleting",
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "KeyDeletionStarted",
+			Message:            "Key deletion job created",
+		},
+	}
+
+	key.Status.ActiveJobName = &job.Name
+	err = r.Status().Update(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	l.Info("Created key deletion job", "job", job.Name)
 	return nil
 }
 
@@ -205,7 +310,7 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 
 func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) (bool, error) {
 	job := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.CreateJobName}, job)
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
 	if err != nil {
 		return false, err
 	}
@@ -227,7 +332,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				},
 			}
 
-			key.Status.CreateJobName = nil
+			key.Status.ActiveJobName = nil
 
 			err = r.Status().Update(ctx, key)
 			if err != nil {
@@ -258,7 +363,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				return false, err
 			}
 
-			key.Status.CreateJobName = nil
+			key.Status.ActiveJobName = nil
 			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
 
 			err = r.Status().Update(ctx, key)
@@ -266,6 +371,51 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				return false, err
 			}
 
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key) (bool, error) {
+	job := &batchv1.Job{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
+	if err != nil {
+		return false, err
+	}
+
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
+			// TODO: signal error through repository status
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			controllerutil.RemoveFinalizer(key, finalizer)
+			if err := r.Update(ctx, key); err != nil {
+				return false, err
+			}
+
+			l.Error(err, "Key deletion job failed", "logs", logs)
+
+			return true, nil
+		}
+
+		if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
+			// TODO: signal error through repository status
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			controllerutil.RemoveFinalizer(key, finalizer)
+			if err := r.Update(ctx, key); err != nil {
+				return false, err
+			}
+
+			l.Info("Key deletion job completed", "logs", logs)
 			return true, nil
 		}
 	}

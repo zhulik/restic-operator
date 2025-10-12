@@ -155,6 +155,81 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *restic
 	return job, nil
 }
 
+func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, deletedKey *resticv1.Key) (*batchv1.Job, error) {
+	var backoffLimit = int32(0)
+
+	var keyList v1.KeyList
+	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
+		return lo.ContainsBy(key.ObjectMeta.OwnerReferences, func(owner metav1.OwnerReference) bool {
+			return owner.UID == repo.UID && key.Name != deletedKey.Name
+		})
+	})
+	if !ok {
+		panic("open key not found")
+	}
+
+	args := []string{"key", "remove", *deletedKey.Status.KeyID}
+	env := jobEnv(repo)
+
+	env = append(env, corev1.EnvVar{
+		Name:  "RESTIC_PASSWORD_FILE",
+		Value: "/current-key/key.txt",
+	})
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("delete-key-%s-%s-", repo.Name, deletedKey.Name),
+			Namespace:    repo.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:            "restic-init",
+							Image:           imageName(repo),
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env:             env,
+							Args:            args,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      openKey.SecretName(),
+									MountPath: "/current-key",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: openKey.SecretName(),
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: openKey.SecretName(),
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "key",
+											Path: "key.txt",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, nil
+
+}
+
 func imageName(repo *resticv1.Repository) string {
 	image := Image
 	tag := LatestTag
