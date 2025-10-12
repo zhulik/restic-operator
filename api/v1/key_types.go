@@ -17,46 +17,41 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// RepositorySpec defines the desired state of Repository
-type RepositorySpec struct {
+// KeySpec defines the desired state of Key
+type KeySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
-	// URL is the URL of the repository
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	Repository string `json:"repository"`
 
-	// Env is the map of environment variables to use when initializing the repository.
-	// For instance, the s3 backend requires at least the following environment variables:
-	// - AWS_ACCESS_KEY_ID
-	// - AWS_SECRET_ACCESS_KEY
-	// +optional
-	Env map[string]corev1.SecretKeySelector `json:"env"`
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	User string `json:"user"`
 
-	// Version is the version of restic to use. Leave it empty to use the latest version.
-	// +optional
-	Version string `json:"version,omitempty"`
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Host string `json:"host"`
 }
 
-// RepositoryStatus defines the observed state of Repository.
-type RepositoryStatus struct {
+// KeyStatus defines the observed state of Key.
+type KeyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// For Kubernetes API conventions, see:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
 
-	// conditions represent the current state of the Repository resource.
+	// conditions represent the current state of the Key resource.
 	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
 	//
 	// Standard condition types include:
@@ -68,44 +63,41 @@ type RepositoryStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	CreateJobName      *string            `json:"createJobName,omitempty"`
-	ObservedGeneration *int64             `json:"observedGeneration,omitempty"`
-	ObservedSpec       *RepositorySpec    `json:"observedSpec,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// +optional
+	KeyID *string `json:"keyID,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
-// +kubebuilder:printcolumn:name="Status",type=string,description="status",JSONPath=`.status.conditions[0].type`
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Repository is the Schema for the repositories API
-type Repository struct {
+// Key is the Schema for the keys API
+type Key struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata is a standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty,omitzero"`
 
-	// spec defines the desired state of Repository
+	// spec defines the desired state of Key
 	// +required
-	Spec RepositorySpec `json:"spec"`
+	Spec KeySpec `json:"spec"`
 
-	// status defines the observed state of Repository
+	// status defines the observed state of Key
 	// +optional
-	Status RepositoryStatus `json:"status,omitempty,omitzero"`
+	Status KeyStatus `json:"status,omitempty,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 
-// RepositoryList contains a list of Repository
-type RepositoryList struct {
+// KeyList contains a list of Key
+type KeyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Repository `json:"items"`
+	Items           []Key `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Repository{}, &RepositoryList{})
+	SchemeBuilder.Register(&Key{}, &KeyList{})
 }

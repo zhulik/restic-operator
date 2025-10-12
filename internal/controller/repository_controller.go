@@ -119,7 +119,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 	}
 
 	for _, condition := range job.Status.Conditions {
-		if condition.Type == "Failed" && condition.Status == v1.ConditionTrue {
+		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
 			logs, err := r.getJobPodLogs(ctx, l, job)
 			if err != nil {
 				return false, err
@@ -148,18 +148,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			return true, nil
 		}
 
-		if condition.Type == "Completed" && condition.Status == v1.ConditionTrue {
-			logs, err := r.getJobPodLogs(ctx, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			keyMapping := map[string]string{}
-			err = json.Unmarshal([]byte(logs), &keyMapping)
-			if err != nil {
-				return false, err
-			}
-
+		if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
 			repo.Status.Conditions = []metav1.Condition{
 				{
 					Type:               "Created",
@@ -170,7 +159,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 				},
 			}
 
-			repo.Status.KeyMapping = keyMapping
 			repo.Status.CreateJobName = nil
 
 			gen := repo.GetGeneration()

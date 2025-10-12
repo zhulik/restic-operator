@@ -4,32 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: repositories.restic.zhulik.wtf
+  name: keys.restic.zhulik.wtf
 spec:
   group: restic.zhulik.wtf
   names:
-    kind: Repository
-    listKind: RepositoryList
-    plural: repositories
-    singular: repository
+    kind: Key
+    listKind: KeyList
+    plural: keys
+    singular: key
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - description: repository
-      jsonPath: .spec.repository
-      name: Repository
-      type: string
-    - description: status
-      jsonPath: .status.conditions[0].type
-      name: Status
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1
+  - name: v1
     schema:
       openAPIV3Schema:
-        description: Repository is the Schema for the repositories API
+        description: Key is the Schema for the keys API
         properties:
           apiVersion:
             description: |-
@@ -49,55 +37,28 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of Repository
+            description: spec defines the desired state of Key
             properties:
-              env:
-                additionalProperties:
-                  description: SecretKeySelector selects a key of a Secret.
-                  properties:
-                    key:
-                      description: The key of the secret to select from.  Must be
-                        a valid secret key.
-                      type: string
-                    name:
-                      default: ""
-                      description: |-
-                        Name of the referent.
-                        This field is effectively required, but due to backwards compatibility is
-                        allowed to be empty. Instances of this type with an empty value here are
-                        almost certainly wrong.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      type: string
-                    optional:
-                      description: Specify whether the Secret or its key must be defined
-                      type: boolean
-                  required:
-                  - key
-                  type: object
-                  x-kubernetes-map-type: atomic
-                description: |-
-                  Env is the map of environment variables to use when initializing the repository.
-                  For instance, the s3 backend requires at least the following environment variables:
-                  - AWS_ACCESS_KEY_ID
-                  - AWS_SECRET_ACCESS_KEY
-                type: object
-              repository:
-                description: URL is the URL of the repository
+              host:
                 minLength: 1
                 type: string
-              version:
-                description: Version is the version of restic to use. Leave it empty
-                  to use the latest version.
+              repository:
+                minLength: 1
+                type: string
+              user:
+                minLength: 1
                 type: string
             required:
+            - host
             - repository
+            - user
             type: object
           status:
-            description: status defines the observed state of Repository
+            description: status defines the observed state of Key
             properties:
               conditions:
                 description: |-
-                  conditions represent the current state of the Repository resource.
+                  conditions represent the current state of the Key resource.
                   Each condition has a unique type and reflects the status of a specific aspect of the resource.
 
                   Standard condition types include:
@@ -164,56 +125,8 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              createJobName:
+              keyID:
                 type: string
-              observedGeneration:
-                format: int64
-                type: integer
-              observedSpec:
-                description: RepositorySpec defines the desired state of Repository
-                properties:
-                  env:
-                    additionalProperties:
-                      description: SecretKeySelector selects a key of a Secret.
-                      properties:
-                        key:
-                          description: The key of the secret to select from.  Must
-                            be a valid secret key.
-                          type: string
-                        name:
-                          default: ""
-                          description: |-
-                            Name of the referent.
-                            This field is effectively required, but due to backwards compatibility is
-                            allowed to be empty. Instances of this type with an empty value here are
-                            almost certainly wrong.
-                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          type: string
-                        optional:
-                          description: Specify whether the Secret or its key must
-                            be defined
-                          type: boolean
-                      required:
-                      - key
-                      type: object
-                      x-kubernetes-map-type: atomic
-                    description: |-
-                      Env is the map of environment variables to use when initializing the repository.
-                      For instance, the s3 backend requires at least the following environment variables:
-                      - AWS_ACCESS_KEY_ID
-                      - AWS_SECRET_ACCESS_KEY
-                    type: object
-                  repository:
-                    description: URL is the URL of the repository
-                    minLength: 1
-                    type: string
-                  version:
-                    description: Version is the version of restic to use. Leave it
-                      empty to use the latest version.
-                    type: string
-                required:
-                - repository
-                type: object
             type: object
         required:
         - spec

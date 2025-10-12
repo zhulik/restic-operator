@@ -2,4 +2,5 @@
 resources:
 - repository_key.yaml
 - restic_v1_repository.yaml
+- restic_v1_key.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

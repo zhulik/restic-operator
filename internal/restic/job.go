@@ -1,9 +1,7 @@
 package restic
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,27 +61,14 @@ func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) 
 }
 
 func jobEnv(repo *resticv1.Repository, command string) ([]corev1.EnvVar, error) {
-	mapping, err := json.Marshal(repo.Status.KeyMapping)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal key mapping: %w", err)
-	}
-
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "RESTIC_REPOSITORY",
 			Value: repo.Spec.Repository,
 		},
 		{
-			Name:  "RESTIC_KEY_MAPPING",
-			Value: string(mapping),
-		},
-		{
 			Name:  "COMMAND",
 			Value: command,
-		},
-		{
-			Name:  "RESTIC_IMPORT",
-			Value: strconv.FormatBool(repo.Spec.Import),
 		},
 	}
 
@@ -101,19 +86,6 @@ func jobEnv(repo *resticv1.Repository, command string) ([]corev1.EnvVar, error) 
 			},
 		})
 	}
-	// Add RESTIC_PASSWORD from the "main" key
-	if mainKey, ok := repo.Spec.Keys["main"]; ok {
-		envVars = append(envVars, corev1.EnvVar{
-			Name: "RESTIC_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: mainKey.Key.Name,
-					},
-					Key: mainKey.Key.Key,
-				},
-			},
-		})
-	}
+
 	return envVars, nil
 }

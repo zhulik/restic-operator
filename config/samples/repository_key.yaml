@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: restic-operator-test
-type: Opaque
-stringData:
-  password: LWQgcGFzc3dvcmQK

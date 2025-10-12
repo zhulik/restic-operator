@@ -21,4 +21,13 @@ resources:
   webhooks:
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: zhulik.wtf
+  group: restic
+  kind: Key
+  path: github.com/zhulik/restic-operator/api/v1
+  version: v1
 version: "3"

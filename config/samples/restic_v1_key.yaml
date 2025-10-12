@@ -1,0 +1,11 @@
+apiVersion: restic.zhulik.wtf/v1
+kind: Key
+metadata:
+  labels:
+    app.kubernetes.io/name: restic-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: key-sample
+spec:
+  repository: repository-sample
+  user: restic
+  host: restic-operator

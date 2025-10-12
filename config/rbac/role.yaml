@@ -7,6 +7,7 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - keys
   - repositories
   verbs:
   - create
@@ -19,12 +20,14 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - keys/finalizers
   - repositories/finalizers
   verbs:
   - update
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - keys/status
   - repositories/status
   verbs:
   - get

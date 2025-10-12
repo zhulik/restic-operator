@@ -27,8 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	corev1 "k8s.io/api/core/v1"
-
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
@@ -69,16 +67,7 @@ func (v *RepositoryCustomValidator) ValidateCreate(ctx context.Context, obj runt
 	}
 	repositorylog.Info("Validation for Repository upon creation", "name", repository.GetName())
 
-	if _, ok := repository.Spec.Keys["main"]; !ok {
-		return nil, fmt.Errorf("main key is required, add a key named main to the keys map")
-	}
-
-	err := v.validateSecrets(ctx, repository.Namespace, repository.Spec.Keys)
-	if err != nil {
-		return nil, err
-	}
-
-	err = v.validateVersion(ctx, repository.Spec.Version)
+	err := v.validateVersion(ctx, repository.Spec.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -102,16 +91,7 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("repository field is immutable")
 	}
 
-	if oldRepo.Spec.Import != updRepo.Spec.Import {
-		return nil, fmt.Errorf("import field is immutable")
-	}
-
-	err := v.validateSecrets(ctx, updRepo.Namespace, updRepo.Spec.Keys)
-	if err != nil {
-		return nil, err
-	}
-
-	err = v.validateVersion(ctx, updRepo.Spec.Version)
+	err := v.validateVersion(ctx, updRepo.Spec.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -122,17 +102,6 @@ func (v *RepositoryCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Repository.
 func (v *RepositoryCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	return nil, nil
-}
-
-func (v *RepositoryCustomValidator) validateSecrets(ctx context.Context, namespace string, secrets map[string]resticv1.ResticKey) error {
-	// TODO: can be done concurrently
-	for _, secret := range secrets {
-		err := v.Client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secret.Key.Name}, &corev1.Secret{})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version string) error {
