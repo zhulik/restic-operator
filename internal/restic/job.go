@@ -2,6 +2,7 @@ package restic
 
 import (
 	"fmt"
+	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -11,24 +12,11 @@ import (
 )
 
 const (
-	Image     = "zhulik/restic"
+	Image     = "restic/restic"
 	LatestTag = "latest"
 )
 
-func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) {
-	image := Image
-	tag := LatestTag
-	if repo.Spec.Version != "" {
-		tag = repo.Spec.Version
-	}
-	image += ":" + tag
-
-	env, err := jobEnv(repo, command)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job environment variables: %w", err)
-	}
-
-	// Create a Kubernetes Job to initialize the repository.
+func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
 	var backoffLimit = int32(0)
 
 	return &batchv1.Job{
@@ -49,43 +37,35 @@ func CreateJob(repo *resticv1.Repository, command string) (*batchv1.Job, error) 
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
-							Image:           image,
+							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             env,
+							Env:             jobEnv(repo),
+							Args:            []string{"init", "--insecure-no-password"},
 						},
 					},
 				},
 			},
 		},
-	}, nil
+	}
 }
 
-func jobEnv(repo *resticv1.Repository, command string) ([]corev1.EnvVar, error) {
+func imageName(repo *resticv1.Repository) string {
+	image := Image
+	tag := LatestTag
+	if repo.Spec.Version != "" {
+		tag = repo.Spec.Version
+	}
+	image += ":" + tag
+	return image
+}
+
+func jobEnv(repo *resticv1.Repository) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "RESTIC_REPOSITORY",
 			Value: repo.Spec.Repository,
 		},
-		{
-			Name:  "COMMAND",
-			Value: command,
-		},
 	}
 
-	// TODO: mount secrets as volumes instead of using environment variables
-	for k, v := range repo.Spec.Env {
-		envVars = append(envVars, corev1.EnvVar{
-			Name: fmt.Sprintf("RESTIC_KEY_%s", k),
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: v.Name,
-					},
-					Key: v.Key,
-				},
-			},
-		})
-	}
-
-	return envVars, nil
+	return slices.Concat(envVars, repo.Spec.Env)
 }

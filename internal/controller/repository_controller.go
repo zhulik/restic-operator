@@ -93,19 +93,12 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if repo.Status.ObservedSpec == nil {
+	if repo.Status.CreateJobName == nil {
 		err = r.startCreateRepoJob(ctx, l, repo)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
-	}
-
-	if repo.Status.ObservedGeneration != nil && *repo.Status.ObservedGeneration != repo.GetGeneration() {
-		err = r.startUpdateRepoJob(ctx, l, repo)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
 	}
 
 	return ctrl.Result{}, nil
@@ -161,10 +154,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 
 			repo.Status.CreateJobName = nil
 
-			gen := repo.GetGeneration()
-			repo.Status.ObservedGeneration = &gen
-			repo.Status.ObservedSpec = &repo.Spec
-
 			err = r.Status().Update(ctx, repo)
 			if err != nil {
 				return false, err
@@ -177,17 +166,8 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 	return false, nil
 }
 
-func (r *RepositoryReconciler) startUpdateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	return nil
-}
-
 func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	job, err := restic.CreateJob(repo, "init")
-	if err != nil {
-		return err
-	}
-
-	// Set owner reference so the job is cleaned up with the Repository
+	job := restic.CreateRepoInitJob(repo)
 	if err := ctrl.SetControllerReference(repo, job, r.Scheme); err != nil {
 		return err
 	}
@@ -207,7 +187,7 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 	}
 	repo.Status.CreateJobName = &job.Name
 
-	err = r.Status().Update(ctx, repo)
+	err := r.Status().Update(ctx, repo)
 	if err != nil {
 		return err
 	}

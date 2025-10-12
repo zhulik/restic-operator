@@ -24,7 +24,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // KeyReconciler reconciles a Key object
@@ -47,11 +51,79 @@ type KeyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	l := logf.FromContext(ctx).WithValues("resource", req)
 
-	// TODO(user): your logic here
+	key := &resticv1.Key{}
+	err := r.Get(ctx, req.NamespacedName, key)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if key.Status.KeyID == nil {
+		l.Info("Key ID is not set, creating and assigning a key")
+		keyID, err := r.createKey(ctx, l, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		key.Status.KeyID = &keyID
+		err = r.Status().Update(ctx, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, key *resticv1.Key) (string, error) {
+	err := r.createSecretIfNotExists(ctx, l, key)
+	if err != nil {
+		return "", err
+	}
+
+	repo := &resticv1.Repository{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
+		}
+		return "", err
+	}
+
+	// TODO: set repo as owner of the key?
+
+	return "", nil
+}
+
+func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.SecretName()}, secret)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		l.Info("Key secret not found, creating", "secret", key.SecretName())
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      key.SecretName(),
+				Namespace: key.Namespace,
+			},
+			StringData: map[string]string{
+				"key": "SomePasssowrd", // TODO: Generate a random password
+			},
+		}
+
+		if err := ctrl.SetControllerReference(key, secret, r.Scheme); err != nil {
+			return err
+		}
+
+		return r.Create(ctx, secret)
+	}
+
+	l.Info("Key secret already exists", "secret", key.SecretName())
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

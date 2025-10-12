@@ -41,7 +41,7 @@ type RepositorySpec struct {
 	// - AWS_ACCESS_KEY_ID
 	// - AWS_SECRET_ACCESS_KEY
 	// +optional
-	Env map[string]corev1.SecretKeySelector `json:"env"`
+	Env []corev1.EnvVar `json:"env"`
 
 	// Version is the version of restic to use. Leave it empty to use the latest version.
 	// +optional
@@ -68,10 +68,8 @@ type RepositoryStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	CreateJobName      *string            `json:"createJobName,omitempty"`
-	ObservedGeneration *int64             `json:"observedGeneration,omitempty"`
-	ObservedSpec       *RepositorySpec    `json:"observedSpec,omitempty"`
+	Conditions    []metav1.Condition `json:"conditions,omitempty"`
+	CreateJobName *string            `json:"createJobName,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: restic-operator
     app.kubernetes.io/managed-by: kustomize
-  name: key-sample
+  name: repository-key-sample
 spec:
   repository: repository-sample
   user: restic

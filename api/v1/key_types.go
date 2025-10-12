@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -87,6 +89,10 @@ type Key struct {
 	// status defines the observed state of Key
 	// +optional
 	Status KeyStatus `json:"status,omitempty,omitzero"`
+}
+
+func (k Key) SecretName() string {
+	return fmt.Sprintf("restic-key-%s-%s", k.Spec.Repository, k.Name)
 }
 
 // +kubebuilder:object:root=true

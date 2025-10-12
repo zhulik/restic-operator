@@ -191,9 +191,9 @@ func (in *RepositorySpec) DeepCopyInto(out *RepositorySpec) {
 	*out = *in
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make(map[string]corev1.SecretKeySelector, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }
@@ -222,16 +222,6 @@ func (in *RepositoryStatus) DeepCopyInto(out *RepositoryStatus) {
 		in, out := &in.CreateJobName, &out.CreateJobName
 		*out = new(string)
 		**out = **in
-	}
-	if in.ObservedGeneration != nil {
-		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
-	}
-	if in.ObservedSpec != nil {
-		in, out := &in.ObservedSpec, &out.ObservedSpec
-		*out = new(RepositorySpec)
-		(*in).DeepCopyInto(*out)
 	}
 }
 
