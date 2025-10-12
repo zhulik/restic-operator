@@ -83,6 +83,15 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, err
 		}
 
+		err := ctrl.SetControllerReference(repo, key, r.Scheme)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.Update(ctx, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 		for _, condition := range key.Status.Conditions {
 			if condition.Type == "Creating" {
 				l.Info("Key is in creating state, checking job status", "job", *key.Status.CreateJobName)
