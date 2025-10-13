@@ -26,6 +26,12 @@ rules:
   - create
   - get
 - apiGroups:
+  - batch
+  resources:
+  - pods/logs
+  verbs:
+  - get
+- apiGroups:
   - restic.zhulik.wtf
   resources:
   - keys
