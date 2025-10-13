@@ -205,7 +205,7 @@ func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func getJobPodLogs(ctx context.Context, kubeclient client.Client, config *rest.Config, l logr.Logger, job *batchv1.Job) (string, error) {
+func getJobPodLogs(ctx context.Context, kubeclient client.Client, config *rest.Config, _ logr.Logger, job *batchv1.Job) (string, error) {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return "", err

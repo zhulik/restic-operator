@@ -12,7 +12,6 @@ import (
 
 	"github.com/samber/lo"
 
-	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	v1 "github.com/zhulik/restic-operator/api/v1"
 )
 
@@ -21,7 +20,7 @@ const (
 	LatestTag = "latest"
 )
 
-func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
+func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 	var backoffLimit = int32(0)
 
 	return &batchv1.Job{
@@ -50,7 +49,7 @@ func CreateRepoInitJob(repo *resticv1.Repository) *batchv1.Job {
 	}
 }
 
-func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, key *resticv1.Key) (*batchv1.Job, error) {
+func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, key *v1.Key) (*batchv1.Job, error) {
 	var backoffLimit = int32(0)
 
 	firstKey := repo.Status.Keys == 0
@@ -122,7 +121,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *restic
 		}
 
 		openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
-			return lo.ContainsBy(key.ObjectMeta.OwnerReferences, func(owner metav1.OwnerReference) bool {
+			return lo.ContainsBy(key.OwnerReferences, func(owner metav1.OwnerReference) bool {
 				return owner.UID == repo.UID
 			})
 		})
@@ -155,7 +154,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *restic
 	return job, nil
 }
 
-func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, deletedKey *resticv1.Key) (*batchv1.Job, error) {
+func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, deletedKey *v1.Key) (*batchv1.Job, error) {
 	var backoffLimit = int32(0)
 
 	var keyList v1.KeyList
@@ -165,7 +164,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *res
 	}
 
 	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
-		return lo.ContainsBy(key.ObjectMeta.OwnerReferences, func(owner metav1.OwnerReference) bool {
+		return lo.ContainsBy(key.OwnerReferences, func(owner metav1.OwnerReference) bool {
 			return owner.UID == repo.UID && key.Name != deletedKey.Name
 		})
 	})
@@ -230,7 +229,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *res
 
 }
 
-func imageName(repo *resticv1.Repository) string {
+func imageName(repo *v1.Repository) string {
 	image := Image
 	tag := LatestTag
 	if repo.Spec.Version != "" {
@@ -240,7 +239,7 @@ func imageName(repo *resticv1.Repository) string {
 	return image
 }
 
-func jobEnv(repo *resticv1.Repository) []corev1.EnvVar {
+func jobEnv(repo *v1.Repository) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "RESTIC_REPOSITORY",

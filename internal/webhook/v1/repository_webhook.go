@@ -104,7 +104,7 @@ func (v *RepositoryCustomValidator) ValidateDelete(ctx context.Context, obj runt
 	return nil, nil
 }
 
-func (v *RepositoryCustomValidator) validateVersion(ctx context.Context, version string) error {
+func (v *RepositoryCustomValidator) validateVersion(_ context.Context, version string) error { //nolint:unparam
 	if version == "" {
 		return nil
 	}
