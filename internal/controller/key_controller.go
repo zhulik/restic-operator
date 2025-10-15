@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -54,18 +55,10 @@ type KeyReconciler struct {
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Key object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	l := logf.FromContext(ctx).WithValues("resource", req)
+	l := logf.FromContext(ctx)
 
 	key := &v1.Key{}
 	err := r.Get(ctx, req.NamespacedName, key)
@@ -73,19 +66,22 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if !key.DeletionTimestamp.IsZero() && key.Status.ActiveJobName == nil {
-		l.Info("Key is being deleted")
+	if !key.DeletionTimestamp.IsZero() {
+		if key.Status.ActiveJobName == nil {
+			l.Info("Key is being deleted")
 
-		err = r.deleteKey(ctx, l, key)
-		if err != nil {
-			return ctrl.Result{}, err
+			err = r.deleteKey(ctx, l, key)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, fmt.Errorf("key is being deleted but has an active job")
 	}
 
-	if key.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(key, finalizer) {
+	if controllerutil.AddFinalizer(key, finalizer) {
 		l.Info("add finalizer")
-		controllerutil.AddFinalizer(key, finalizer)
+
 		err = r.Update(ctx, key)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -113,8 +109,9 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		for _, condition := range key.Status.Conditions {
-			if condition.Type == "Creating" {
+		if conditionType, ok := containsAnyTrueCondition(key.Status.Conditions, "Creating", "Deleting", "Failed", "Created"); ok {
+			switch conditionType {
+			case "Creating":
 				l.Info("Key is in creating state, checking job status", "job", *key.Status.ActiveJobName)
 				completed, err := r.checkCreateJobStatus(ctx, l, repo, key)
 				if err != nil {
@@ -126,9 +123,8 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				}
 
 				return ctrl.Result{}, nil
-			}
 
-			if condition.Type == "Deleting" {
+			case "Deleting":
 				l.Info("Key is in deleting state, checking job status", "job", *key.Status.ActiveJobName)
 				completed, err := r.checkDeleteJobStatus(ctx, l, key)
 				if err != nil {
@@ -140,9 +136,8 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				}
 
 				return ctrl.Result{}, nil
-			}
 
-			if condition.Type == "Failed" || condition.Type == "Created" {
+			case "Failed", "Created":
 				return ctrl.Result{}, nil
 			}
 		}
@@ -158,20 +153,18 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 	}
 
-	for _, condition := range key.Status.Conditions {
-		if condition.Type == "Deleting" {
-			l.Info("Key is in deleting state, checking job status", "job", *key.Status.ActiveJobName)
-			completed, err := r.checkDeleteJobStatus(ctx, l, key)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			if !completed {
-				return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
-			}
-
-			return ctrl.Result{}, nil
+	if _, ok := containsAnyTrueCondition(key.Status.Conditions, "Deleting"); ok {
+		l.Info("Key is in deleting state, checking job status", "job", *key.Status.ActiveJobName)
+		completed, err := r.checkDeleteJobStatus(ctx, l, key)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
+
+		if !completed {
+			return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+		}
+
+		return ctrl.Result{}, nil
 	}
 
 	l.Info("Key ID is set, job is done")
@@ -316,62 +309,58 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		return false, err
 	}
 
-	if jobHasCondition(job, batchv1.JobFailed) {
+	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
 		if err != nil {
 			return false, err
 		}
 
-		key.Status.Conditions = []metav1.Condition{
-			{
-				Type:               "Failed",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "KeyCreationJobFailed",
-				Message:            logs,
-			},
+		switch conditionType {
+		case batchv1.JobFailed:
+			key.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Failed",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "KeyCreationJobFailed",
+					Message:            logs,
+				},
+			}
+
+			key.Status.ActiveJobName = nil
+
+			err = r.Status().Update(ctx, key)
+			if err != nil {
+				return false, err
+			}
+
+			repo.Status.Keys--
+			err = r.Status().Update(ctx, repo)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		case batchv1.JobComplete:
+			key.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Created",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "KeyCreationJobCompleted",
+					Message:            "Key creation job successfully completed",
+				},
+			}
+
+			key.Status.ActiveJobName = nil
+			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
+
+			err = r.Status().Update(ctx, key)
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
 		}
-
-		key.Status.ActiveJobName = nil
-
-		err = r.Status().Update(ctx, key)
-		if err != nil {
-			return false, err
-		}
-
-		repo.Status.Keys--
-		err = r.Status().Update(ctx, repo)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}
-
-	if jobHasCondition(job, batchv1.JobComplete) {
-		key.Status.Conditions = []metav1.Condition{
-			{
-				Type:               "Created",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "KeyCreationJobCompleted",
-				Message:            "Key creation job successfully completed",
-			},
-		}
-
-		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-		if err != nil {
-			return false, err
-		}
-
-		key.Status.ActiveJobName = nil
-		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
-
-		err = r.Status().Update(ctx, key)
-		if err != nil {
-			return false, err
-		}
-
-		return true, nil
 	}
 
 	return false, nil
@@ -384,37 +373,26 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 		return false, err
 	}
 
-	if jobHasCondition(job, batchv1.JobFailed) {
-		// TODO: signal error through repository status
-		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-		if err != nil {
-			return false, err
+	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobFailed); ok {
+		switch conditionType {
+		case batchv1.JobFailed:
+			// TODO: signal error through repository status
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return false, err
+			}
+
+			l.Error(err, "Key deletion job failed", "logs", logs)
+
+			return true, nil
+		case batchv1.JobComplete:
+			controllerutil.RemoveFinalizer(key, finalizer)
+			if err := r.Update(ctx, key); err != nil {
+				return false, err
+			}
+
+			return true, nil
 		}
-
-		controllerutil.RemoveFinalizer(key, finalizer)
-		if err := r.Update(ctx, key); err != nil {
-			return false, err
-		}
-
-		l.Error(err, "Key deletion job failed", "logs", logs)
-
-		return true, nil
-	}
-
-	if jobHasCondition(job, batchv1.JobComplete) {
-		// TODO: signal error through repository status
-		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-		if err != nil {
-			return false, err
-		}
-
-		controllerutil.RemoveFinalizer(key, finalizer)
-		if err := r.Update(ctx, key); err != nil {
-			return false, err
-		}
-
-		l.Info("Key deletion job completed", "logs", logs)
-		return true, nil
 	}
 
 	return false, nil

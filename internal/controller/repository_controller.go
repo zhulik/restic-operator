@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
@@ -29,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
@@ -47,44 +45,29 @@ type RepositoryReconciler struct {
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;create;watch
 // +kubebuilder:rbac:groups=core,resources=pods/logs,verbs=get
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Repository object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := logf.FromContext(ctx)
 
 	repo := &resticv1.Repository{}
 	err := r.Get(ctx, req.NamespacedName, repo)
 	if err != nil {
-		return reconcile.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if repo.Status.CreateJobName != nil {
 		err = r.checkCreateJobStatus(ctx, l, repo)
-		return reconcile.Result{}, err
+		return ctrl.Result{}, err
 	}
 
-	if repo.Status.Conditions != nil {
-		for _, condition := range repo.Status.Conditions {
-			if condition.Type == "Failed" || condition.Type == "Created" {
-				l.Info(fmt.Sprintf("Repo is in %s state, job is done.", condition.Type))
-				return reconcile.Result{}, nil
-			}
-		}
+	if _, ok := containsAnyTrueCondition(repo.Status.Conditions, "Created", "Failed"); ok {
+		return ctrl.Result{}, nil
 	}
 
 	err = r.startCreateRepoJob(ctx, l, repo)
-	return reconcile.Result{}, err
+	return ctrl.Result{}, err
 }
 
 func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
@@ -94,51 +77,42 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 		return err
 	}
 
-	if jobHasCondition(job, batchv1.JobFailed) {
-		l.Info("Create job failed, updating repository status")
-		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-		if err != nil {
-			return err
-		}
+	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
+		switch conditionType {
+		case batchv1.JobFailed:
+			l.Info("Create job failed, updating repository status")
+			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+			if err != nil {
+				return err
+			}
 
-		repo.Status.Conditions = []metav1.Condition{
-			{
-				Type:               "Failed",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryInitializationJobFailed",
-				Message:            logs,
-			},
-		}
-		repo.Status.CreateJobName = nil
-		repo.Status.Keys = 0
-		err = r.Status().Update(ctx, repo)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+			repo.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Failed",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryInitializationJobFailed",
+					Message:            logs,
+				},
+			}
 
-	if jobHasCondition(job, batchv1.JobComplete) {
-		l.Info("Create job successfully completed, updating repository status")
-		repo.Status.Conditions = []metav1.Condition{
-			{
-				Type:               "Created",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryInitializationJobCompleted",
-				Message:            "Repository initialization job successfully completed",
-			},
+		case batchv1.JobComplete:
+			l.Info("Create job successfully completed, updating repository status")
+			repo.Status.Conditions = []metav1.Condition{
+				{
+					Type:               "Created",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryInitializationJobCompleted",
+					Message:            "Repository initialization job successfully completed",
+				},
+			}
 		}
 
 		repo.Status.CreateJobName = nil
 		repo.Status.Keys = 0
-		err = r.Status().Update(ctx, repo)
-		if err != nil {
-			return err
-		}
 
-		return nil
+		return r.Status().Update(ctx, repo)
 	}
 
 	return nil
