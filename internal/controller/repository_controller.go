@@ -22,7 +22,6 @@ import (
 
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -95,53 +94,51 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 		return err
 	}
 
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
-			l.Info("Create job failed, updating repository status")
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return err
-			}
-
-			repo.Status.Conditions = []metav1.Condition{
-				{
-					Type:               "Failed",
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryInitializationJobFailed",
-					Message:            logs,
-				},
-			}
-			repo.Status.CreateJobName = nil
-			repo.Status.Keys = 0
-			err = r.Status().Update(ctx, repo)
-			if err != nil {
-				return err
-			}
-			return nil
+	if jobHasCondition(job, batchv1.JobFailed) {
+		l.Info("Create job failed, updating repository status")
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return err
 		}
 
-		if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
-			l.Info("Create job successfully completed, updating repository status")
-			repo.Status.Conditions = []metav1.Condition{
-				{
-					Type:               "Created",
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryInitializationJobCompleted",
-					Message:            "Repository initialization job successfully completed",
-				},
-			}
-
-			repo.Status.CreateJobName = nil
-			repo.Status.Keys = 0
-			err = r.Status().Update(ctx, repo)
-			if err != nil {
-				return err
-			}
-
-			return nil
+		repo.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Failed",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryInitializationJobFailed",
+				Message:            logs,
+			},
 		}
+		repo.Status.CreateJobName = nil
+		repo.Status.Keys = 0
+		err = r.Status().Update(ctx, repo)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if jobHasCondition(job, batchv1.JobComplete) {
+		l.Info("Create job successfully completed, updating repository status")
+		repo.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Created",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryInitializationJobCompleted",
+				Message:            "Repository initialization job successfully completed",
+			},
+		}
+
+		repo.Status.CreateJobName = nil
+		repo.Status.Keys = 0
+		err = r.Status().Update(ctx, repo)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return nil

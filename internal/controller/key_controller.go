@@ -316,64 +316,62 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		return false, err
 	}
 
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			key.Status.Conditions = []metav1.Condition{
-				{
-					Type:               "Failed",
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "KeyCreationJobFailed",
-					Message:            logs,
-				},
-			}
-
-			key.Status.ActiveJobName = nil
-
-			err = r.Status().Update(ctx, key)
-			if err != nil {
-				return false, err
-			}
-
-			repo.Status.Keys--
-			err = r.Status().Update(ctx, repo)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
+	if jobHasCondition(job, batchv1.JobFailed) {
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return false, err
 		}
 
-		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-			key.Status.Conditions = []metav1.Condition{
-				{
-					Type:               "Created",
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "KeyCreationJobCompleted",
-					Message:            "Key creation job successfully completed",
-				},
-			}
-
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			key.Status.ActiveJobName = nil
-			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
-
-			err = r.Status().Update(ctx, key)
-			if err != nil {
-				return false, err
-			}
-
-			return true, nil
+		key.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Failed",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "KeyCreationJobFailed",
+				Message:            logs,
+			},
 		}
+
+		key.Status.ActiveJobName = nil
+
+		err = r.Status().Update(ctx, key)
+		if err != nil {
+			return false, err
+		}
+
+		repo.Status.Keys--
+		err = r.Status().Update(ctx, repo)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	if jobHasCondition(job, batchv1.JobComplete) {
+		key.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Created",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "KeyCreationJobCompleted",
+				Message:            "Key creation job successfully completed",
+			},
+		}
+
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return false, err
+		}
+
+		key.Status.ActiveJobName = nil
+		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
+
+		err = r.Status().Update(ctx, key)
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
 	}
 
 	return false, nil
@@ -386,39 +384,37 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 		return false, err
 	}
 
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-			// TODO: signal error through repository status
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			controllerutil.RemoveFinalizer(key, finalizer)
-			if err := r.Update(ctx, key); err != nil {
-				return false, err
-			}
-
-			l.Error(err, "Key deletion job failed", "logs", logs)
-
-			return true, nil
+	if jobHasCondition(job, batchv1.JobFailed) {
+		// TODO: signal error through repository status
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return false, err
 		}
 
-		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-			// TODO: signal error through repository status
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return false, err
-			}
-
-			controllerutil.RemoveFinalizer(key, finalizer)
-			if err := r.Update(ctx, key); err != nil {
-				return false, err
-			}
-
-			l.Info("Key deletion job completed", "logs", logs)
-			return true, nil
+		controllerutil.RemoveFinalizer(key, finalizer)
+		if err := r.Update(ctx, key); err != nil {
+			return false, err
 		}
+
+		l.Error(err, "Key deletion job failed", "logs", logs)
+
+		return true, nil
+	}
+
+	if jobHasCondition(job, batchv1.JobComplete) {
+		// TODO: signal error through repository status
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return false, err
+		}
+
+		controllerutil.RemoveFinalizer(key, finalizer)
+		if err := r.Update(ctx, key); err != nil {
+			return false, err
+		}
+
+		l.Info("Key deletion job completed", "logs", logs)
+		return true, nil
 	}
 
 	return false, nil
