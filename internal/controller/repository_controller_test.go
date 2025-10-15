@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package controller_test
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/controller"
 )
 
 var _ = Describe("Repository Controller", func() {
@@ -70,7 +71,7 @@ var _ = Describe("Repository Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &RepositoryReconciler{
+			controllerReconciler := &controller.RepositoryReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
