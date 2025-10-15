@@ -19,15 +19,12 @@ package controller
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
 
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -52,8 +49,8 @@ type RepositoryReconciler struct {
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;create
-// +kubebuilder:rbac:groups=batch,resources=pods/logs,verbs=get
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;create;watch
+// +kubebuilder:rbac:groups=core,resources=pods/logs,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -65,7 +62,7 @@ type RepositoryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	l := logf.FromContext(ctx).WithValues("resource", req)
+	l := logf.FromContext(ctx)
 
 	repo := &resticv1.Repository{}
 	err := r.Get(ctx, req.NamespacedName, repo)
@@ -73,22 +70,13 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if repo.Status.CreateJobName != nil {
+		err = r.checkCreateJobStatus(ctx, l, repo)
+		return reconcile.Result{}, err
+	}
+
 	if repo.Status.Conditions != nil {
 		for _, condition := range repo.Status.Conditions {
-			if condition.Type == "Creating" {
-				l.Info("Repo is in creating state, checking job status", "job", *repo.Status.CreateJobName)
-				completed, err := r.checkCreateJobStatus(ctx, l, repo)
-				if err != nil {
-					return reconcile.Result{}, err
-				}
-
-				if !completed {
-					return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
-				}
-
-				return reconcile.Result{}, nil
-			}
-
 			if condition.Type == "Failed" || condition.Type == "Created" {
 				l.Info(fmt.Sprintf("Repo is in %s state, job is done.", condition.Type))
 				return reconcile.Result{}, nil
@@ -96,29 +84,23 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if repo.Status.CreateJobName == nil {
-		err = r.startCreateRepoJob(ctx, l, repo)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
-	}
-
-	return ctrl.Result{}, nil
+	err = r.startCreateRepoJob(ctx, l, repo)
+	return reconcile.Result{}, err
 }
 
-func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository) (bool, error) {
+func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: *repo.Status.CreateJobName}, job)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobFailed && condition.Status == v1.ConditionTrue {
+			l.Info("Create job failed, updating repository status")
 			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			repo.Status.Conditions = []metav1.Condition{
@@ -134,12 +116,13 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			repo.Status.Keys = 0
 			err = r.Status().Update(ctx, repo)
 			if err != nil {
-				return false, err
+				return err
 			}
-			return true, nil
+			return nil
 		}
 
 		if condition.Type == batchv1.JobComplete && condition.Status == v1.ConditionTrue {
+			l.Info("Create job successfully completed, updating repository status")
 			repo.Status.Conditions = []metav1.Condition{
 				{
 					Type:               "Created",
@@ -154,14 +137,14 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			repo.Status.Keys = 0
 			err = r.Status().Update(ctx, repo)
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			return true, nil
+			return nil
 		}
 	}
 
-	return false, nil
+	return nil
 }
 
 func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
@@ -190,9 +173,7 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 		return err
 	}
 
-	l.Info("Repository status updated", "status", repo.Status)
-
-	l.Info("Created repository initialization job", "job", job.Name)
+	l.Info("Repository initialization job created", "job", job.Name)
 	return nil
 }
 
@@ -200,45 +181,7 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&resticv1.Repository{}).
+		Owns(&batchv1.Job{}).
 		Named("repository").
 		Complete(r)
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func getJobPodLogs(ctx context.Context, kubeclient client.Client, config *rest.Config, _ logr.Logger, job *batchv1.Job) (string, error) {
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", err
-	}
-
-	container := job.Spec.Template.Spec.Containers[0]
-
-	// Find pods created by the job using controller-runtime client
-	var podList v1.PodList
-	err = kubeclient.List(ctx, &podList,
-		client.InNamespace(job.Namespace),
-		client.MatchingLabels{"batch.kubernetes.io/job-name": job.Name})
-	if err != nil {
-		return "", fmt.Errorf("failed to list pods for job %s: %w", job.Name, err)
-	}
-
-	pod := podList.Items[0]
-
-	// Get logs using the clientset
-	req := clientset.CoreV1().Pods(job.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{
-		Container: container.Name,
-	})
-
-	stream, err := req.Stream(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to stream logs from pod %s: %w", pod.Name, err)
-	}
-	defer stream.Close() // nolint:errcheck
-
-	logs, err := io.ReadAll(stream)
-	if err != nil {
-		return "", fmt.Errorf("failed to read logs from pod %s: %w", pod.Name, err)
-	}
-
-	return string(logs), nil
 }

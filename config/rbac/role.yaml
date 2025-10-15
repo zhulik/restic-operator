@@ -14,6 +14,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/logs
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
@@ -25,12 +31,7 @@ rules:
   verbs:
   - create
   - get
-- apiGroups:
-  - batch
-  resources:
-  - pods/logs
-  verbs:
-  - get
+  - watch
 - apiGroups:
   - restic.zhulik.wtf
   resources:
