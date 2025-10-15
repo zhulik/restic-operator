@@ -68,7 +68,7 @@ type KeyStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// +optional
-	ActiveJobName *string `json:"createJobName,omitempty"`
+	ActiveJobName *string `json:"activeJobName,omitempty"`
 
 	// +optional
 	KeyID *string `json:"keyID,omitempty"`

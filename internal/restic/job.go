@@ -25,8 +25,8 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("init-repo-%s-", repo.Name),
-			Namespace:    repo.Namespace,
+			Name:      fmt.Sprintf("init-repo-%s", repo.Name),
+			Namespace: repo.Namespace,
 		},
 
 		Spec: batchv1.JobSpec{
@@ -49,12 +49,12 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 	}
 }
 
-func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, key *v1.Key) (*batchv1.Job, error) {
+func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 	var backoffLimit = int32(0)
 
 	firstKey := repo.Status.Keys == 0
 
-	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", key.Spec.Host, "--user", key.Spec.User}
+	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", addedKey.Spec.Host, "--user", addedKey.Spec.User}
 	env := jobEnv(repo)
 
 	if firstKey {
@@ -68,8 +68,8 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("add-key-%s-%s-", repo.Name, key.Name),
-			Namespace:    repo.Namespace,
+			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
+			Namespace: repo.Namespace,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoffLimit,
@@ -85,7 +85,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 							Args:            args,
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      key.SecretName(),
+									Name:      addedKey.SecretName(),
 									MountPath: "/new-key",
 									ReadOnly:  true,
 								},
@@ -94,10 +94,10 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 					},
 					Volumes: []corev1.Volume{
 						{
-							Name: key.SecretName(),
+							Name: addedKey.SecretName(),
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: key.SecretName(),
+									SecretName: addedKey.SecretName(),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  "key",
@@ -123,7 +123,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 		openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
 			return lo.ContainsBy(key.OwnerReferences, func(owner metav1.OwnerReference) bool {
 				return owner.UID == repo.UID
-			})
+			}) && key.Name != addedKey.Name
 		})
 		if !ok {
 			panic("open key not found")
@@ -182,8 +182,8 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("delete-key-%s-%s-", repo.Name, deletedKey.Name),
-			Namespace:    repo.Namespace,
+			Name:      fmt.Sprintf("delete-key-%s-%s", repo.Name, deletedKey.Name),
+			Namespace: repo.Namespace,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoffLimit,

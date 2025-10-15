@@ -124,10 +124,6 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 		return err
 	}
 
-	if err := r.Create(ctx, job); err != nil {
-		return err
-	}
-
 	repo.Status.Conditions = []metav1.Condition{
 		{
 			Type:               "Creating",
@@ -141,6 +137,10 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 
 	err := r.Status().Update(ctx, repo)
 	if err != nil {
+		return err
+	}
+
+	if err := r.Create(ctx, job); err != nil {
 		return err
 	}
 
