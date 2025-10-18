@@ -20,6 +20,22 @@ const (
 	LatestTag = "latest"
 )
 
+var podSecurityContext = &corev1.PodSecurityContext{
+	RunAsNonRoot: lo.ToPtr(true),
+	RunAsUser:    lo.ToPtr(int64(1000)),
+	RunAsGroup:   lo.ToPtr(int64(1000)),
+	SeccompProfile: &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	},
+}
+
+var containerSecurityContext = &corev1.SecurityContext{
+	Capabilities: &corev1.Capabilities{
+		Drop: []corev1.Capability{"ALL"},
+	},
+	AllowPrivilegeEscalation: lo.ToPtr(false),
+}
+
 func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 	var backoffLimit = int32(0)
 
@@ -33,7 +49,8 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: podSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
@@ -41,6 +58,7 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             jobEnv(repo),
 							Args:            []string{"init", "--insecure-no-password"},
+							SecurityContext: containerSecurityContext,
 						},
 					},
 				},
@@ -75,7 +93,8 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: podSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
@@ -83,6 +102,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             env,
 							Args:            args,
+							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      addedKey.SecretName(),
@@ -189,7 +209,8 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: podSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
@@ -197,6 +218,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             env,
 							Args:            args,
+							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      openKey.SecretName(),
