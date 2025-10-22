@@ -68,8 +68,6 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 }
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	var backoffLimit = int32(0)
-
 	firstKey := repo.Status.Keys == 0
 
 	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", addedKey.Spec.Host, "--user", addedKey.Spec.User}
@@ -90,7 +88,6 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 			Namespace: repo.Namespace,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
@@ -175,8 +172,6 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 }
 
 func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, deletedKey *v1.Key) (*batchv1.Job, error) {
-	var backoffLimit = int32(0)
-
 	var keyList v1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 	if err != nil {
@@ -206,7 +201,6 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 			Namespace: repo.Namespace,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,

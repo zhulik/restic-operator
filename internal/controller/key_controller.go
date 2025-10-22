@@ -20,6 +20,8 @@ import (
 	"context"
 	"regexp"
 
+	"github.com/sethvargo/go-password/password"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -233,6 +235,11 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 			return err
 		}
 
+		res, err := password.Generate(64, 10, 10, false, true)
+		if err != nil {
+			return err
+		}
+
 		l.Info("Key secret not found, creating", "secret", key.SecretName())
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -240,7 +247,7 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 				Namespace: key.Namespace,
 			},
 			StringData: map[string]string{
-				"key": "SomePasssowrd", // TODO: Generate a random password
+				"key": res,
 			},
 		}
 
