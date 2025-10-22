@@ -301,7 +301,7 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal("Created"))
 			}
-			Eventually(verifyRepositoryCreated, 2*time.Minute).Should(Succeed())
+			Eventually(verifyRepositoryCreated, 30*time.Second).Should(Succeed())
 		})
 
 		It("should fail to create a repository if it already exists", func() {
@@ -315,7 +315,7 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal("Failed"))
 			}
-			Eventually(verifyRepositoryFailed, 2*time.Minute).Should(Succeed())
+			Eventually(verifyRepositoryFailed, 30*time.Second).Should(Succeed())
 		})
 
 		// TODO: Customize the e2e test suite with scenarios specific to your project.
