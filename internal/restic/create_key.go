@@ -39,7 +39,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             jobEnv(repo, addedKey),
 							Command:         []string{"/bin/sh", "-c"},
-							Args:            []string{string(addFirstKeyScript)},
+							Args:            []string{addFirstKeyScript},
 							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
