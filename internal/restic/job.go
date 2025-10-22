@@ -68,12 +68,12 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 }
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	firstKey := repo.Status.Keys == 0
+	firstRealKey := repo.Status.Keys == 1
 
 	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", addedKey.Spec.Host, "--user", addedKey.Spec.User}
 	env := jobEnv(repo)
 
-	if firstKey {
+	if firstRealKey {
 		args = append(args, "--insecure-no-password")
 	} else {
 		env = append(env, corev1.EnvVar{
@@ -130,7 +130,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 		},
 	}
 
-	if !firstKey {
+	if !firstRealKey {
 		var keyList v1.KeyList
 		err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 		if err != nil {
