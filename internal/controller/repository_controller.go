@@ -107,11 +107,18 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Reason:             "RepositoryInitializationJobCompleted",
 					Message:            "Repository initialization job successfully completed",
 				},
+				{
+					Type:               "Secure",
+					Status:             metav1.ConditionFalse,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryInitializedWithoutPassword",
+					Message:            "Repository initialized without password. A key needs to be added to the repository to make it secure.",
+				},
 			}
 		}
 
 		repo.Status.CreateJobName = nil
-		repo.Status.Keys = 0
+		repo.Status.Keys = 1 // When created with --insecure-no-password, a key is automatically created
 
 		return r.Status().Update(ctx, repo)
 	}

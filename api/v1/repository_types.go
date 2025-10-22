@@ -71,7 +71,7 @@ type RepositoryStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// +optional
-	Keys int `json:"keys,omitempty"`
+	Keys int `json:"keys"`
 
 	// +optional
 	CreateJobName *string `json:"createJobName,omitempty"`
