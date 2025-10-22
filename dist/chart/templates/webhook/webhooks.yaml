@@ -11,6 +11,26 @@ metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
 webhooks:
+  - name: vkey-v1.kb.io
+    clientConfig:
+      service:
+        name: restic-operator-webhook-service
+        namespace: {{ .Release.Namespace }}
+        path: /validate-restic-zhulik-wtf-v1-key
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+        apiGroups:
+          - restic.zhulik.wtf
+        apiVersions:
+          - v1
+        resources:
+          - keys
   - name: vrepository-v1.kb.io
     clientConfig:
       service:

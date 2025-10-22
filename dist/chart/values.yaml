@@ -3,7 +3,7 @@ controllerManager:
   replicas: 1
   container:
     image:
-      repository: controller
+      repository: ghcr.io/zhulik/restic-operator:latest
       tag: latest
     imagePullPolicy: IfNotPresent
     args:
