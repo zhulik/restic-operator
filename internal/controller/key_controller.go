@@ -158,12 +158,6 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 		return err
 	}
 
-	repo.Status.Keys++
-	err = r.Status().Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
 	if err := r.Create(ctx, job); err != nil {
 		return err
 	}
@@ -308,17 +302,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 
 			key.Status.ActiveJobName = nil
 
-			err = r.Status().Update(ctx, key)
-			if err != nil {
-				return err
-			}
-
-			repo.Status.Keys--
-			err = r.Status().Update(ctx, repo)
-			if err != nil {
-				return err
-			}
-			return nil
+			return r.Status().Update(ctx, key)
 		case batchv1.JobComplete:
 			key.Status.Conditions = []metav1.Condition{
 				{
@@ -339,7 +323,16 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				return err
 			}
 
-			return nil
+			repo.Status.Conditions, _ = updateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
+				Type:               "Secure",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryHasAtLeastOneKey",
+				Message:            "Repository has at least one secure key",
+			})
+
+			repo.Status.Keys++
+			return r.Status().Update(ctx, repo)
 		}
 	}
 

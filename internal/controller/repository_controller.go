@@ -111,8 +111,8 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Type:               "Secure",
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryInitializedWithoutPassword",
-					Message:            "Repository initialized without password. A key needs to be added to the repository to make it secure.",
+					Reason:             "RepositoryHasNoKeys",
+					Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
 				},
 			}
 		}
