@@ -4,15 +4,20 @@ metadata:
   labels:
     app.kubernetes.io/name: restic-operator
     app.kubernetes.io/managed-by: kustomize
-  name: repository-sample
+  name: arch-backup-repository
 
 spec:
-  repository: rest:http://restic-rest-server.default.svc.cluster.local:8000/test
+  repository: s3:https://minio.zhulik.wtf/backups/arch
 
   # env:
-    # AWS_ACCESS_KEY_ID:
-    #   name: restic-operator-test
-    #   key: aws-access-key-id
-    # AWS_SECRET_ACCESS_KEY:
-    #   name: restic-operator-test
-    #   key: aws-secret-access-key
+  #   - name: AWS_ACCESS_KEY_ID
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: secret
+  #         key: accessKey
+
+  #   - name: AWS_SECRET_ACCESS_KEY
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: secret
+  #         key: secretKey
