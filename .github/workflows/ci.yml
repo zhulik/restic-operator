@@ -22,7 +22,7 @@ jobs:
           version: v2.4.0
 
   test-helm:
-    name: Run on Ubuntu
+    name: Test helm chart
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
@@ -106,7 +106,7 @@ jobs:
 #          kubectl wait --namespace restic-operator-system --for=jsonpath='{.kind}'=ServiceMonitor servicemonitor/restic-operator-controller-manager-metrics-monitor
 
   test-e2e:
-    name: Run on Ubuntu
+    name: Test e2e
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
@@ -132,7 +132,7 @@ jobs:
           make test-e2e
 
   test:
-    name: Run on Ubuntu
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
