@@ -1,0 +1,18 @@
+apiVersion: restic.zhulik.wtf/v1
+kind: Repository
+metadata:
+  labels:
+    app.kubernetes.io/name: restic-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: repository-sample-duplicate
+
+spec:
+  repository: rest:http://restic-rest-server.default.svc.cluster.local:8000/test
+
+  # env:
+    # AWS_ACCESS_KEY_ID:
+    #   name: restic-operator-test
+    #   key: aws-access-key-id
+    # AWS_SECRET_ACCESS_KEY:
+    #   name: restic-operator-test
+    #   key: aws-secret-access-key

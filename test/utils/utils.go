@@ -224,3 +224,27 @@ func UncommentCode(filename, target, prefix string) error {
 
 	return nil
 }
+
+func InstallResticRestServer() error {
+	cmd := exec.Command("kubectl", "apply", "-f", "config/restic-rest-server/install.yaml")
+	_, err := Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.Command("kubectl", "wait", "deployment.apps/restic-rest-server",
+		"--for", "condition=Available",
+		"--namespace", "default",
+		"--timeout", "5m",
+	)
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UninstallResticRestServer() error {
+	cmd := exec.Command("kubectl", "delete", "-f", "config/restic-rest-server/install.yaml")
+	_, err := Run(cmd)
+	return err
+}

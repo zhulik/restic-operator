@@ -81,6 +81,8 @@ var _ = BeforeSuite(func() {
 			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
 		}
 	}
+	By("installing restic rest server")
+	Expect(utils.InstallResticRestServer()).To(Succeed(), "Failed to install restic rest server")
 })
 
 var _ = AfterSuite(func() {
@@ -89,4 +91,5 @@ var _ = AfterSuite(func() {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
 		utils.UninstallCertManager()
 	}
+	utils.UninstallResticRestServer()
 })

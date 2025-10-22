@@ -290,7 +290,6 @@ var _ = Describe("Manager", Ordered, func() {
 		// +kubebuilder:scaffold:e2e-webhooks-checks
 
 		It("should create a repository", func() {
-			By("creating a repository")
 			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/restic_v1_repository.yaml", "-n", namespace)
 			_, err := utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred(), "Failed to create repository")
@@ -303,6 +302,20 @@ var _ = Describe("Manager", Ordered, func() {
 				g.Expect(output).To(Equal("Created"))
 			}
 			Eventually(verifyRepositoryCreated, 2*time.Minute).Should(Succeed())
+		})
+
+		It("should fail to create a repository if it already exists", func() {
+			cmd := exec.Command("kubectl", "apply", "-f", "config/samples/restic_v1_repository_duplicate.yaml", "-n", namespace)
+			_, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), "Failed to create repository")
+
+			verifyRepositoryFailed := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "repositories", "repository-sample-duplicate", "-n", namespace, "-o", "jsonpath={.status.conditions[0].type}")
+				output, err := utils.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(output).To(Equal("Failed"))
+			}
+			Eventually(verifyRepositoryFailed, 2*time.Minute).Should(Succeed())
 		})
 
 		// TODO: Customize the e2e test suite with scenarios specific to your project.
