@@ -29,7 +29,12 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 							Name:            "restic-init",
 							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             jobEnv(repo),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "RESTIC_REPOSITORY",
+									Value: repo.Spec.Repository,
+								},
+							},
 							Args:            []string{"init", "--insecure-no-password"},
 							SecurityContext: containerSecurityContext,
 						},

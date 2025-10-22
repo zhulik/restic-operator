@@ -39,11 +39,23 @@ func imageName(repo *v1.Repository) string {
 	return image
 }
 
-func jobEnv(repo *v1.Repository) []corev1.EnvVar {
+func jobEnv(repo *v1.Repository, key *v1.Key) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name:  "RESTIC_REPOSITORY",
 			Value: repo.Spec.Repository,
+		},
+		{
+			Name:  "RESTIC_HOST",
+			Value: key.Spec.Host,
+		},
+		{
+			Name:  "RESTIC_USER",
+			Value: key.Spec.User,
+		},
+		{
+			Name:  "NEW_KEY_FILE",
+			Value: "/new-key/key.txt",
 		},
 	}
 

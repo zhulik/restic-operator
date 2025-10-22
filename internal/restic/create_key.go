@@ -22,9 +22,6 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 }
 
 func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", addedKey.Spec.Host, "--user", addedKey.Spec.User, "--insecure-no-password"}
-	env := jobEnv(repo)
-
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
@@ -40,8 +37,9 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 							Name:            "restic-init",
 							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             env,
-							Args:            args,
+							Env:             jobEnv(repo, addedKey),
+							Command:         []string{"/bin/sh", "-c"},
+							Args:            []string{string(addFirstKeyScript)},
 							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -72,13 +70,9 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 			},
 		},
 	}, nil
-
 }
 
 func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	args := []string{"key", "add", "--new-password-file", "/new-key/key.txt", "--host", addedKey.Spec.Host, "--user", addedKey.Spec.User}
-	env := jobEnv(repo)
-
 	var keyList v1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 	if err != nil {
@@ -109,8 +103,13 @@ func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, 
 							Name:            "restic-init",
 							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             env,
-							Args:            args,
+							Env:             jobEnv(repo, addedKey),
+							Args: []string{
+								"key", "add",
+								"--new-password-file", "$(NEW_KEY_FILE)",
+								"--host", addedKey.Spec.Host,
+								"--user", addedKey.Spec.User,
+							},
 							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{

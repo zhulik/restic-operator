@@ -29,7 +29,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 	}
 
 	args := []string{"key", "remove", *deletedKey.Status.KeyID}
-	env := jobEnv(repo)
+	env := jobEnv(repo, deletedKey)
 
 	env = append(env, corev1.EnvVar{
 		Name:  "RESTIC_PASSWORD_FILE",
