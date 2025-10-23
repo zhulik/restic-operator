@@ -115,10 +115,10 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
 				},
 			}
+			repo.Status.Keys = 1 // When created with --insecure-no-password, a key is automatically created
 		}
 
 		repo.Status.CreateJobName = nil
-		repo.Status.Keys = 1 // When created with --insecure-no-password, a key is automatically created
 
 		return r.Status().Update(ctx, repo)
 	}
