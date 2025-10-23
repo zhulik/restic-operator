@@ -4,10 +4,10 @@ metadata:
   labels:
     app.kubernetes.io/name: restic-operator
     app.kubernetes.io/managed-by: kustomize
-  name: arch-backup-repository
+  name: repository-sample
 
 spec:
-  repository: s3:https://minio.zhulik.wtf/backups/arch
+  repository: rest:http://restic-rest-server.default.svc.cluster.local:8000/test
 
   # env:
   #   - name: AWS_ACCESS_KEY_ID
