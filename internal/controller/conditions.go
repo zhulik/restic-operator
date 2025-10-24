@@ -40,6 +40,6 @@ func updateCondition(conditions []metav1.Condition, conditionType string, newCon
 		return conditions, false
 	}
 
-	conditions = append(conditions, newCondition)
-	return conditions, true
+	newConditions = append(newConditions, newCondition)
+	return newConditions, true
 }
