@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/sethvargo/go-password/password"
@@ -254,6 +255,18 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 		}
 
 		return r.Create(ctx, secret)
+	}
+
+	if len(secret.OwnerReferences) == 0 {
+		return fmt.Errorf("secret %s already exists but has no owner references", key.SecretName())
+	}
+
+	if len(secret.OwnerReferences) > 1 {
+		return fmt.Errorf("secret %s already exists but has multiple owner references", key.SecretName())
+	}
+
+	if secret.OwnerReferences[0].UID != key.UID {
+		return fmt.Errorf("secret %s is owned by another resource: %s/%s", key.SecretName(), secret.OwnerReferences[0].Kind, secret.OwnerReferences[0].Name)
 	}
 
 	l.Info("Key secret already exists", "secret", key.SecretName())
