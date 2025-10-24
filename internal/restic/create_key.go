@@ -30,7 +30,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
 			Namespace: repo.Namespace,
 			Annotations: map[string]string{
-				"restic-operator.zhulik.wtf/first-key": "true",
+				"restic.zhulik.wtf/first-key": "true",
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -80,15 +80,15 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 
 func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 	var keyList v1.KeyList
-	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
+	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
+		"restic.zhulik.wtf/repository": repo.Name,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
-		return lo.ContainsBy(key.OwnerReferences, func(owner metav1.OwnerReference) bool {
-			return owner.UID == repo.UID
-		}) && key.Name != addedKey.Name
+		return key.Name != addedKey.Name
 	})
 	if !ok {
 		panic("open key not found")
@@ -99,7 +99,7 @@ func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, 
 			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
 			Namespace: repo.Namespace,
 			Annotations: map[string]string{
-				"restic-operator.zhulik.wtf/first-key": "false",
+				"restic.zhulik.wtf/first-key": "false",
 			},
 		},
 		Spec: batchv1.JobSpec{

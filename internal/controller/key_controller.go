@@ -44,7 +44,10 @@ import (
 
 var keyIDRegex = regexp.MustCompile(`saved new key with ID (\w+)`)
 
-const finalizer = "restic.zhulik.wtf/finalizer"
+const (
+	finalizer                       = "restic.zhulik.wtf/finalizer"
+	keySecretType corev1.SecretType = "restic.zhulik.wtf/key"
+)
 
 // KeyReconciler reconciles a Key object
 type KeyReconciler struct {
@@ -244,7 +247,12 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      key.SecretName(),
 				Namespace: key.Namespace,
+				Labels: map[string]string{
+					"restic.zhulik.wtf/key":        key.Name,
+					"restic.zhulik.wtf/repository": key.Spec.Repository,
+				},
 			},
+			Type: keySecretType,
 			StringData: map[string]string{
 				"key": res,
 			},
@@ -341,7 +349,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			}
 
 			// First key was added, so we can mark the repository as secure
-			firstKey := job.Annotations["restic-operator.zhulik.wtf/first-key"] == "true"
+			firstKey := job.Annotations["restic.zhulik.wtf/first-key"] == "true"
 			if firstKey {
 				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
 					Type:               "Secure",
