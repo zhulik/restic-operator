@@ -3,6 +3,7 @@ package restic
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -109,7 +110,12 @@ func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, 
 							Name:            "restic-init",
 							Image:           imageName(repo),
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env:             jobEnv(repo, addedKey),
+							Env: slices.Concat(jobEnv(repo, addedKey), []corev1.EnvVar{
+								{
+									Name:  "RESTIC_PASSWORD_FILE",
+									Value: "/current-key/key.txt",
+								},
+							}),
 							Args: []string{
 								"key", "add",
 								"--new-password-file", "$(NEW_KEY_FILE)",
