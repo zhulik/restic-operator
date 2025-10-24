@@ -37,6 +37,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/zhulik/restic-operator/internal/conditions"
 	"github.com/zhulik/restic-operator/internal/restic"
 )
 
@@ -114,7 +115,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	if _, ok := containsAnyTrueCondition(key.Status.Conditions, "Failed", "Created"); ok {
+	if _, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, "Failed", "Created"); ok {
 		return ctrl.Result{}, nil
 	}
 
@@ -263,7 +264,7 @@ func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger,
 		return err
 	}
 
-	if conditionType, ok := containsAnyTrueCondition(key.Status.Conditions, "Creating", "Deleting"); ok {
+	if conditionType, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, "Creating", "Deleting"); ok {
 		switch conditionType {
 		case "Creating":
 			return r.checkCreateJobStatus(ctx, l, repo, key)
@@ -282,7 +283,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		return err
 	}
 
-	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
+	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
 		if err != nil {
 			return err
@@ -326,7 +327,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			// First key was added, so we can mark the repository as secure
 			firstKey := job.Annotations["restic-operator.zhulik.wtf/first-key"] == "true"
 			if firstKey {
-				repo.Status.Conditions, _ = updateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
+				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
 					Type:               "Secure",
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
@@ -351,7 +352,7 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 		return err
 	}
 
-	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
+	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		switch conditionType {
 		case batchv1.JobFailed:
 			// TODO: signal error through repository status

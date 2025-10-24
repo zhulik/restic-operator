@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"github.com/zhulik/restic-operator/internal/conditions"
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +64,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	if _, ok := containsAnyTrueCondition(repo.Status.Conditions, "Created", "Failed"); ok {
+	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Created", "Failed"); ok {
 		return ctrl.Result{}, nil
 	}
 
@@ -78,7 +79,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 		return err
 	}
 
-	if conditionType, ok := jobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
+	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		switch conditionType {
 		case batchv1.JobFailed:
 			l.Info("Create job failed, updating repository status")

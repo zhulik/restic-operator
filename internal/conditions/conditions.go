@@ -1,4 +1,4 @@
-package controller
+package conditions
 
 import (
 	"slices"
@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func jobHasAnyTrueCondition(job *batchv1.Job, conditionTypes ...batchv1.JobConditionType) (batchv1.JobConditionType, bool) {
+func JobHasAnyTrueCondition(job *batchv1.Job, conditionTypes ...batchv1.JobConditionType) (batchv1.JobConditionType, bool) {
 	for _, condition := range job.Status.Conditions {
 		if slices.Contains(conditionTypes, condition.Type) && condition.Status == corev1.ConditionTrue {
 			return condition.Type, true
@@ -18,7 +18,7 @@ func jobHasAnyTrueCondition(job *batchv1.Job, conditionTypes ...batchv1.JobCondi
 	return "", false
 }
 
-func containsAnyTrueCondition(conditions []metav1.Condition, conditionTypes ...string) (string, bool) {
+func ContainsAnyTrueCondition(conditions []metav1.Condition, conditionTypes ...string) (string, bool) {
 	if conditions == nil {
 		return "", false
 	}
@@ -31,7 +31,7 @@ func containsAnyTrueCondition(conditions []metav1.Condition, conditionTypes ...s
 	return "", false
 }
 
-func updateCondition(conditions []metav1.Condition, conditionType string, newCondition metav1.Condition) ([]metav1.Condition, bool) {
+func UpdateCondition(conditions []metav1.Condition, conditionType string, newCondition metav1.Condition) ([]metav1.Condition, bool) {
 	newConditions := lo.Filter(conditions, func(condition metav1.Condition, _ int) bool {
 		return condition.Type != conditionType
 	})

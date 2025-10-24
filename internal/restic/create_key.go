@@ -12,10 +12,12 @@ import (
 
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/conditions"
 )
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	if repo.Status.Keys == 1 {
+	_, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Secure")
+	if !ok {
 		return addFirstKey(repo, addedKey)
 	}
 	return addKey(ctx, kubeclient, repo, addedKey)
