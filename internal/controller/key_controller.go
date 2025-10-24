@@ -177,10 +177,13 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 
 		// If the repository is not found, we consider the key already deleted
 		controllerutil.RemoveFinalizer(key, finalizer)
-		if err := r.Update(ctx, key); err != nil {
-			return err
-		}
-		return nil
+		return r.Update(ctx, key)
+	}
+
+	if !repo.DeletionTimestamp.IsZero() {
+		// If the repository is being deleted, we consider the key already deleted
+		controllerutil.RemoveFinalizer(key, finalizer)
+		return r.Update(ctx, key)
 	}
 
 	job, err := restic.CreateDeleteKeyJob(ctx, r.Client, repo, key)
