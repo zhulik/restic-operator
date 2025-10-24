@@ -64,7 +64,16 @@ func (v *KeyCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Obj
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Key.
 func (v *KeyCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	return nil, fmt.Errorf("key is immutable")
+	old := oldObj.(*resticv1.Key)
+	new := newObj.(*resticv1.Key)
+
+	if old.Spec.Host != new.Spec.Host ||
+		old.Spec.User != new.Spec.User ||
+		old.Spec.Repository != new.Spec.Repository {
+		return nil, fmt.Errorf("key spec is immutable")
+	}
+
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Key.
