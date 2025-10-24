@@ -55,7 +55,7 @@ type KeyReconciler struct {
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=keys/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;create
 
 func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := logf.FromContext(ctx)

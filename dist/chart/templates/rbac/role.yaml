@@ -35,6 +35,7 @@ rules:
   verbs:
   - create
   - get
+  - list
 - apiGroups:
   - batch
   resources:
