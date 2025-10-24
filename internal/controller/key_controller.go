@@ -323,15 +323,20 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				return err
 			}
 
-			repo.Status.Conditions, _ = updateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
-				Type:               "Secure",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryHasAtLeastOneKey",
-				Message:            "Repository has at least one secure key",
-			})
-
-			repo.Status.Keys++
+			// First key was added, so we can mark the repository as secure
+			firstKey := job.Annotations["restic-operator.zhulik.wtf/first-key"] == "true"
+			if firstKey {
+				repo.Status.Conditions, _ = updateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
+					Type:               "Secure",
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Reason:             "RepositoryHasAtLeastOneKey",
+					Message:            "Repository has at least one secure key",
+				})
+			} else {
+				// Other key was added, so we increment the number of keys
+				repo.Status.Keys++
+			}
 			return r.Status().Update(ctx, repo)
 		}
 	}

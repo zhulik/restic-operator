@@ -26,6 +26,9 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
 			Namespace: repo.Namespace,
+			Annotations: map[string]string{
+				"restic-operator.zhulik.wtf/first-key": "true",
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -92,6 +95,9 @@ func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
 			Namespace: repo.Namespace,
+			Annotations: map[string]string{
+				"restic-operator.zhulik.wtf/first-key": "false",
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
