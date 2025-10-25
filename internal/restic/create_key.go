@@ -2,7 +2,6 @@ package restic
 
 import (
 	"context"
-	"fmt"
 	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -27,10 +26,12 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
-			Namespace: repo.Namespace,
+			GenerateName: "add-key-",
+			Namespace:    repo.Namespace,
 			Annotations: map[string]string{
-				"restic.zhulik.wtf/first-key": "true",
+				"restic.zhulik.wtf/first-key":  "true",
+				"restic.zhulik.wtf/key":        addedKey.Name,
+				"restic.zhulik.wtf/repository": repo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -96,10 +97,12 @@ func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, 
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("add-key-%s-%s", repo.Name, addedKey.Name),
-			Namespace: repo.Namespace,
+			GenerateName: "add-key-",
+			Namespace:    repo.Namespace,
 			Annotations: map[string]string{
-				"restic.zhulik.wtf/first-key": "false",
+				"restic.zhulik.wtf/first-key":  "false",
+				"restic.zhulik.wtf/key":        addedKey.Name,
+				"restic.zhulik.wtf/repository": repo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{

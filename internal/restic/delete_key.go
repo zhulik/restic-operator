@@ -2,7 +2,6 @@ package restic
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
@@ -38,8 +37,13 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("delete-key-%s-%s", repo.Name, deletedKey.Name),
-			Namespace: repo.Namespace,
+			GenerateName: "delete-key-",
+			Namespace:    repo.Namespace,
+			Annotations: map[string]string{
+				"restic.zhulik.wtf/first-key":  "true",
+				"restic.zhulik.wtf/key":        deletedKey.Name,
+				"restic.zhulik.wtf/repository": repo.Name,
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{

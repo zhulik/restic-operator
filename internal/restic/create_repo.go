@@ -1,7 +1,6 @@
 package restic
 
 import (
-	"fmt"
 	"slices"
 
 	v1 "github.com/zhulik/restic-operator/api/v1"
@@ -15,8 +14,11 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("init-repo-%s", repo.Name),
-			Namespace: repo.Namespace,
+			GenerateName: "init-repo-",
+			Namespace:    repo.Namespace,
+			Annotations: map[string]string{
+				"restic.zhulik.wtf/repository": repo.Name,
+			},
 		},
 
 		Spec: batchv1.JobSpec{
