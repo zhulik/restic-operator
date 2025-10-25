@@ -22,19 +22,6 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 		return nil, fmt.Errorf("repository is in %s status, cannot add key, should be retried", statusType)
 	}
 
-	repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Locked", metav1.Condition{
-		Type:               "Locked",
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "RepositoryIsLocked",
-		Message:            "Repository is locked, this has nothing to do with restic repository locking, it's used for restic-operator internal concurrency control",
-	})
-
-	err := kubeclient.Status().Update(ctx, repo)
-	if err != nil {
-		return nil, err
-	}
-
 	_, ok = conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Secure")
 	if !ok {
 		return addFirstKey(repo, addedKey)
@@ -42,7 +29,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 
 	// If the repository already has keys, we pick the first one that came along to open the repo and add the new key
 	var keyList v1.KeyList
-	err = kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
+	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
 		"restic.zhulik.wtf/repository": repo.Name,
 	})
 	if err != nil {

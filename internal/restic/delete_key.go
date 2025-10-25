@@ -20,16 +20,6 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 		return nil, fmt.Errorf("repository is in %s status, cannot delete key, should be retried", statusType)
 	}
 
-	repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Locked", metav1.Condition{
-		Type:               "Locked",
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "RepositoryIsLocked",
-		Message:            "Repository is locked, this has nothing to do with restic repository locking, it's used for restic-operator internal concurrency control",
-	})
-
-	// TODO: when delete key job is done, we need to update the repository conditions: unlock it and update the number of keys
-
 	var keyList v1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 	if err != nil {
