@@ -2,9 +2,11 @@ package restic
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/conditions"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +14,19 @@ import (
 )
 
 func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, deletedKey *v1.Key) (*batchv1.Job, error) {
+	statusType, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Creating", "Locked")
+	if ok {
+		return nil, fmt.Errorf("repository is in %s status, cannot delete key, should be retried", statusType)
+	}
+
+	repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Locked", metav1.Condition{
+		Type:               "Locked",
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryIsLocked",
+		Message:            "Repository is locked, this has nothing to do with restic repository locking, it's used for restic-operator internal concurrency control",
+	})
+
 	var keyList v1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 	if err != nil {

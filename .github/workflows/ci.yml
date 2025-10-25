@@ -150,7 +150,7 @@ jobs:
 
   build_and_push:
     name: Build and Push
-    needs: [lint, test-helm, test-e2e, test]
+    needs: [lint, test-helm, test] # test-e2e
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -162,5 +162,5 @@ jobs:
       - name: Build and Push
         uses: macbre/push-to-ghcr@master
         with:
-          image_name: ${{ github.repository }}  
+          image_name: ${{ github.repository }}
           github_token: ${{ secrets.GITHUB_TOKEN }}

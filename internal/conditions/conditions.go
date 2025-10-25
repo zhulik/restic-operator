@@ -10,8 +10,16 @@ import (
 )
 
 func JobHasAnyTrueCondition(job *batchv1.Job, conditionTypes ...batchv1.JobConditionType) (batchv1.JobConditionType, bool) {
+	return JobHasAnyConditionWithStatus(job, corev1.ConditionTrue, conditionTypes...)
+}
+
+func JobHasAnyFalseCondition(job *batchv1.Job, conditionTypes ...batchv1.JobConditionType) (batchv1.JobConditionType, bool) {
+	return JobHasAnyConditionWithStatus(job, corev1.ConditionFalse, conditionTypes...)
+}
+
+func JobHasAnyConditionWithStatus(job *batchv1.Job, status corev1.ConditionStatus, conditionTypes ...batchv1.JobConditionType) (batchv1.JobConditionType, bool) {
 	for _, condition := range job.Status.Conditions {
-		if slices.Contains(conditionTypes, condition.Type) && condition.Status == corev1.ConditionTrue {
+		if slices.Contains(conditionTypes, condition.Type) && condition.Status == status {
 			return condition.Type, true
 		}
 	}
@@ -19,12 +27,16 @@ func JobHasAnyTrueCondition(job *batchv1.Job, conditionTypes ...batchv1.JobCondi
 }
 
 func ContainsAnyTrueCondition(conditions []metav1.Condition, conditionTypes ...string) (string, bool) {
-	if conditions == nil {
-		return "", false
-	}
+	return ContainsAnyConditionWithStatus(conditions, metav1.ConditionTrue, conditionTypes...)
+}
 
+func ContainsAnyFalseCondition(conditions []metav1.Condition, conditionTypes ...string) (string, bool) {
+	return ContainsAnyConditionWithStatus(conditions, metav1.ConditionFalse, conditionTypes...)
+}
+
+func ContainsAnyConditionWithStatus(conditions []metav1.Condition, status metav1.ConditionStatus, conditionTypes ...string) (string, bool) {
 	for _, condition := range conditions {
-		if slices.Contains(conditionTypes, condition.Type) && condition.Status == metav1.ConditionTrue {
+		if slices.Contains(conditionTypes, condition.Type) && condition.Status == status {
 			return condition.Type, true
 		}
 	}

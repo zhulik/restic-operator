@@ -331,8 +331,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			}
 
 			key.Status.ActiveJobName = nil
-
-			return r.Status().Update(ctx, key)
 		case batchv1.JobComplete:
 			key.Status.Conditions = []metav1.Condition{
 				{
@@ -348,11 +346,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
 			l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
 
-			err = r.Status().Update(ctx, key)
-			if err != nil {
-				return err
-			}
-
 			// First key was added, so we can mark the repository as secure
 			firstKey := job.Annotations["restic.zhulik.wtf/first-key"] == "true"
 			if firstKey {
@@ -367,8 +360,19 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				// Other key was added, so we increment the number of keys
 				repo.Status.Keys++
 			}
-			return r.Status().Update(ctx, repo)
 		}
+		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
+			Type:               "Locked",
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "RepositoryIsNotLocked",
+			Message:            "Repository is not locked, this has nothing to with restic repository locking, it's used for restic-operator internal concurrency control",
+		})
+		err = r.Status().Update(ctx, key)
+		if err != nil {
+			return err
+		}
+		return r.Status().Update(ctx, repo)
 	}
 
 	return nil
