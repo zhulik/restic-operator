@@ -48,6 +48,12 @@ var keyIDRegex = regexp.MustCompile(`saved new key with ID (\w+)`)
 const (
 	finalizer                       = "restic.zhulik.wtf/finalizer"
 	keySecretType corev1.SecretType = "restic.zhulik.wtf/key"
+
+	keyPending  = "Pending"
+	keyCreating = "Creating"
+	keyDeleting = "Deleting"
+	keyFailed   = "Failed"
+	keyCreated  = "Created"
 )
 
 // KeyReconciler reconciles a Key object
@@ -125,13 +131,13 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	if _, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, "Failed", "Created"); ok {
+	if _, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, keyCreating, keyFailed); ok {
 		return ctrl.Result{}, nil
 	}
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               "Pending",
+			Type:               keyPending,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyCreationPending",
@@ -173,7 +179,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               "Creating",
+			Type:               keyCreating,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyCreationStarted",
@@ -231,7 +237,7 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               "Deleting",
+			Type:               keyDeleting,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyDeletionStarted",
@@ -308,11 +314,11 @@ func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger,
 		return err
 	}
 
-	if conditionType, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, "Creating", "Deleting"); ok {
+	if conditionType, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, keyCreating, keyDeleting); ok {
 		switch conditionType {
-		case "Creating":
+		case keyCreating:
 			return r.checkCreateJobStatus(ctx, l, repo, key)
-		case "Deleting":
+		case keyDeleting:
 			return r.checkDeleteJobStatus(ctx, l, key)
 		}
 	}
@@ -337,7 +343,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		case batchv1.JobFailed:
 			key.Status.Conditions = []metav1.Condition{
 				{
-					Type:               "Failed",
+					Type:               keyFailed,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "KeyCreationJobFailed",
@@ -349,7 +355,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		case batchv1.JobComplete:
 			key.Status.Conditions = []metav1.Condition{
 				{
-					Type:               "Created",
+					Type:               keyCreated,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "KeyCreationJobCompleted",
@@ -362,10 +368,10 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
 
 			// First key was added, so we can mark the repository as secure
-			firstKey := job.Annotations["restic.zhulik.wtf/first-key"] == "true"
+			firstKey := job.Annotations[labels.FirstKey] == "true"
 			if firstKey {
-				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
-					Type:               "Secure",
+				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, repositorySecure, metav1.Condition{
+					Type:               repositorySecure,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryHasAtLeastOneKey",
@@ -376,8 +382,8 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				repo.Status.Keys++
 			}
 		}
-		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Locked", metav1.Condition{
-			Type:               "Locked",
+		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, repositoryLocked, metav1.Condition{
+			Type:               repositoryLocked,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "RepositoryIsNotLocked",

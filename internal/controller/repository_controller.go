@@ -34,6 +34,14 @@ import (
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 )
 
+const (
+	repositoryCreated  = "Created"
+	repositoryFailed   = "Failed"
+	repositoryCreating = "Creating"
+	repositoryLocked   = "Locked"
+	repositorySecure   = "Secure"
+)
+
 // RepositoryReconciler reconciles a Repository object
 type RepositoryReconciler struct {
 	client.Client
@@ -64,7 +72,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Created", "Failed"); ok {
+	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, repositoryCreated, repositoryFailed); ok {
 		return ctrl.Result{}, nil
 	}
 
@@ -90,7 +98,7 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 
 			repo.Status.Conditions = []metav1.Condition{
 				{
-					Type:               "Failed",
+					Type:               repositoryFailed,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryInitializationJobFailed",
@@ -102,21 +110,21 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			l.Info("Create job successfully completed, updating repository status")
 			repo.Status.Conditions = []metav1.Condition{
 				{
-					Type:               "Created",
+					Type:               repositoryCreated,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryInitializationJobCompleted",
 					Message:            "Repository initialization job successfully completed",
 				},
 				{
-					Type:               "Secure",
+					Type:               repositorySecure,
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryHasNoKeys",
 					Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
 				},
 				{
-					Type:               "Locked",
+					Type:               repositoryLocked,
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: metav1.Now(),
 					Reason:             "RepositoryIsNotLocked",
@@ -146,7 +154,7 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 
 	repo.Status.Conditions = []metav1.Condition{
 		{
-			Type:               "Creating",
+			Type:               repositoryCreating,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "RepositoryInitializationStarted",
