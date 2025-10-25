@@ -114,6 +114,11 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	key.Labels = map[string]string{
+		"restic.zhulik.wtf/repository": key.Spec.Repository,
+	}
+
 	err = r.Update(ctx, key)
 	if err != nil {
 		return ctrl.Result{}, err

@@ -2,6 +2,7 @@ package restic
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -19,7 +20,27 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 	if !ok {
 		return addFirstKey(repo, addedKey)
 	}
-	return addKey(ctx, kubeclient, repo, addedKey)
+
+	// If the repository already has keys, we pick the first one that came along to open the repo and add the new key
+	var keyList v1.KeyList
+	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
+		"restic.zhulik.wtf/repository": repo.Name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(keyList.Items) == 0 {
+		return nil, fmt.Errorf("no keys found for repository %s", repo.Name)
+	}
+
+	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
+		// We don't want to use the key that we're adding
+		return key.Name != addedKey.Name
+	})
+	if !ok {
+		panic("open key not found")
+	}
+	return addKey(repo, addedKey, &openKey)
 
 }
 
@@ -79,22 +100,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 	}, nil
 }
 
-func addKey(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	var keyList v1.KeyList
-	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
-		"restic.zhulik.wtf/repository": repo.Name,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
-		return key.Name != addedKey.Name
-	})
-	if !ok {
-		panic("open key not found")
-	}
-
+func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "add-key-",
