@@ -71,7 +71,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      addedKey.SecretName(),
+									Name:      "new-key",
 									MountPath: "/new-key",
 									ReadOnly:  true,
 								},
@@ -80,7 +80,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 					},
 					Volumes: []corev1.Volume{
 						{
-							Name: addedKey.SecretName(),
+							Name: "new-key",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName: addedKey.SecretName(),
@@ -136,12 +136,12 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 							SecurityContext: containerSecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      addedKey.SecretName(),
+									Name:      "new-key",
 									MountPath: "/new-key",
 									ReadOnly:  true,
 								},
 								{
-									Name:      openKey.SecretName(),
+									Name:      "open-key",
 									MountPath: "/current-key",
 									ReadOnly:  true,
 								},
@@ -150,7 +150,7 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 					},
 					Volumes: []corev1.Volume{
 						{
-							Name: addedKey.SecretName(),
+							Name: "new-key",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName: addedKey.SecretName(),
@@ -164,7 +164,7 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 							},
 						},
 						{
-							Name: openKey.SecretName(),
+							Name: "open-key",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName: openKey.SecretName(),
