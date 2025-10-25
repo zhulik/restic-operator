@@ -147,6 +147,10 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 		return err
 	}
 
+	if err := r.Create(ctx, job); err != nil {
+		return err
+	}
+
 	key.Status.Conditions = []metav1.Condition{
 		{
 			Type:               "Creating",
@@ -160,10 +164,6 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 	key.Status.ActiveJobName = &job.Name
 	err = r.Status().Update(ctx, key)
 	if err != nil {
-		return err
-	}
-
-	if err := r.Create(ctx, job); err != nil {
 		return err
 	}
 
