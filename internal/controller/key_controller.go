@@ -361,7 +361,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				repo.Status.Keys++
 			}
 		}
-		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Secure", metav1.Condition{
+		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, "Locked", metav1.Condition{
 			Type:               "Locked",
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
