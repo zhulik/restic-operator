@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zhulik/restic-operator/internal/conditions"
+	"github.com/zhulik/restic-operator/internal/labels"
 	"github.com/zhulik/restic-operator/internal/restic"
 )
 
@@ -267,8 +268,8 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 				Name:      key.SecretName(),
 				Namespace: key.Namespace,
 				Labels: map[string]string{
-					"restic.zhulik.wtf/key":        key.Name,
-					"restic.zhulik.wtf/repository": key.Spec.Repository,
+					labels.Key:        key.Name,
+					labels.Repository: key.Spec.Repository,
 				},
 			},
 			Type: keySecretType,

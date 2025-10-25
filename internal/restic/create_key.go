@@ -13,6 +13,7 @@ import (
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/conditions"
+	"github.com/zhulik/restic-operator/internal/labels"
 )
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
@@ -68,9 +69,9 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 			GenerateName: "add-key-",
 			Namespace:    repo.Namespace,
 			Annotations: map[string]string{
-				"restic.zhulik.wtf/first-key":  "true",
-				"restic.zhulik.wtf/key":        addedKey.Name,
-				"restic.zhulik.wtf/repository": repo.Name,
+				labels.FirstKey:   "true",
+				labels.Key:        addedKey.Name,
+				labels.Repository: repo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -124,9 +125,9 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 			GenerateName: "add-key-",
 			Namespace:    repo.Namespace,
 			Annotations: map[string]string{
-				"restic.zhulik.wtf/first-key":  "false",
-				"restic.zhulik.wtf/key":        addedKey.Name,
-				"restic.zhulik.wtf/repository": repo.Name,
+				labels.FirstKey:   "false",
+				labels.Key:        addedKey.Name,
+				labels.Repository: repo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{

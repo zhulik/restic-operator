@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/conditions"
+	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,9 +58,9 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 			GenerateName: "delete-key-",
 			Namespace:    repo.Namespace,
 			Annotations: map[string]string{
-				"restic.zhulik.wtf/first-key":  "true",
-				"restic.zhulik.wtf/key":        deletedKey.Name,
-				"restic.zhulik.wtf/repository": repo.Name,
+				labels.FirstKey:   "true",
+				labels.Key:        deletedKey.Name,
+				labels.Repository: repo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
