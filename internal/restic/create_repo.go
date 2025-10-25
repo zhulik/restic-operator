@@ -10,6 +10,8 @@ import (
 )
 
 func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
+	var backoffLimit = int32(1)
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "init-repo-",
@@ -20,6 +22,7 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 		},
 
 		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
