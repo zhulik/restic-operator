@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/cronexpr"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -31,7 +33,7 @@ import (
 
 // nolint:unused
 // log is for logging in this package.
-var forgetschedulelog = logf.Log.WithName("forgetschedule-resource")
+var forgetSchedulelog = logf.Log.WithName("forgetschedule-resource")
 
 // SetupForgetScheduleWebhookWithManager registers the webhook for ForgetSchedule in the manager.
 func SetupForgetScheduleWebhookWithManager(mgr ctrl.Manager) error {
@@ -60,37 +62,46 @@ var _ webhook.CustomValidator = &ForgetScheduleCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type ForgetSchedule.
 func (v *ForgetScheduleCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	forgetschedule, ok := obj.(*resticv1.ForgetSchedule)
+	forgetSchedule, ok := obj.(*resticv1.ForgetSchedule)
 	if !ok {
 		return nil, fmt.Errorf("expected a ForgetSchedule object but got %T", obj)
 	}
-	forgetschedulelog.Info("Validation for ForgetSchedule upon creation", "name", forgetschedule.GetName())
+	forgetSchedulelog.Info("Validation for ForgetSchedule upon creation", "name", forgetSchedule.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
-
-	return nil, nil
+	return nil, v.validateForgetScheduleSpec(forgetSchedule.Spec)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type ForgetSchedule.
 func (v *ForgetScheduleCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	forgetschedule, ok := newObj.(*resticv1.ForgetSchedule)
+	forgetSchedule, ok := newObj.(*resticv1.ForgetSchedule)
 	if !ok {
 		return nil, fmt.Errorf("expected a ForgetSchedule object for the newObj but got %T", newObj)
 	}
-	forgetschedulelog.Info("Validation for ForgetSchedule upon update", "name", forgetschedule.GetName())
+	forgetSchedulelog.Info("Validation for ForgetSchedule upon update", "name", forgetSchedule.GetName())
 
 	// TODO(user): fill in your validation logic upon object update.
 
-	return nil, nil
+	return nil, v.validateForgetScheduleSpec(forgetSchedule.Spec)
+}
+
+func (v *ForgetScheduleCustomValidator) validateForgetScheduleSpec(spec resticv1.ForgetScheduleSpec) error {
+	if _, err := cronexpr.Parse(spec.Schedule); err != nil {
+		return fmt.Errorf("schedule is invalid: %w", err)
+	}
+	if spec.KeepLast+spec.KeepHourly+spec.KeepDaily+
+		spec.KeepWeekly+spec.KeepMonthly+spec.KeepYearly == 0 {
+		return fmt.Errorf("at least one of keepLast, keepHourly, keepDaily, keepWeekly, keepMonthly, keepYearly must be set")
+	}
+	return nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type ForgetSchedule.
 func (v *ForgetScheduleCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	forgetschedule, ok := obj.(*resticv1.ForgetSchedule)
+	forgetSchedule, ok := obj.(*resticv1.ForgetSchedule)
 	if !ok {
 		return nil, fmt.Errorf("expected a ForgetSchedule object but got %T", obj)
 	}
-	forgetschedulelog.Info("Validation for ForgetSchedule upon deletion", "name", forgetschedule.GetName())
+	forgetSchedulelog.Info("Validation for ForgetSchedule upon deletion", "name", forgetSchedule.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
 

@@ -41,11 +41,11 @@ var _ = Describe("ForgetSchedule Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		forgetschedule := &resticv1.ForgetSchedule{}
+		forgetSchedule := &resticv1.ForgetSchedule{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind ForgetSchedule")
-			err := k8sClient.Get(ctx, typeNamespacedName, forgetschedule)
+			err := k8sClient.Get(ctx, typeNamespacedName, forgetSchedule)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &resticv1.ForgetSchedule{
 					ObjectMeta: metav1.ObjectMeta{
