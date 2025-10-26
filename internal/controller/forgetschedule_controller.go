@@ -79,6 +79,16 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
+	if forgetSchedule.OwnerReferences == nil {
+		if err := ctrl.SetControllerReference(repo, forgetSchedule, r.Scheme); err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.Update(ctx, forgetSchedule)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	key := &resticv1.Key{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.Spec.Key}, key)
 	if err != nil {
@@ -101,10 +111,6 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.JobName()}, cronJob)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			if err := ctrl.SetControllerReference(repo, forgetSchedule, r.Scheme); err != nil {
-				return ctrl.Result{}, err
-			}
-
 			return ctrl.Result{}, r.createForgetJob(ctx, l, forgetSchedule, repo, keySecret)
 		}
 		return ctrl.Result{}, err
