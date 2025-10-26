@@ -89,10 +89,20 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 
 			repo.SetFailedCondition(logs)
 
+			r.Recorder.Eventf(repo,
+				"Warning", "RepositoryInitializationJobFailed",
+				"Repository initialization job %s failed: %s", job.Name, logs,
+			)
+
 		case batchv1.JobComplete:
 			l.Info("Create job successfully completed, updating repository status")
 			repo.SetCreatedCondition()
 			repo.SetSecureCondition()
+
+			r.Recorder.Eventf(repo,
+				"Normal", "RepositoryInitializationJobCompleted",
+				"Repository initialization job %s successfully completed", job.Name,
+			)
 		}
 
 		repo.Status.CreateJobName = nil
@@ -120,7 +130,12 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 		return err
 	}
 
-	l.Info("Repository initialization job created", "job", job.Name)
+	r.Recorder.Eventf(repo,
+		"Normal", "RepositoryInitializationJobStarted",
+		"Repository initialization job %s started", job.Name,
+	)
+
+	l.Info("Repository initialization job started", "job", job.Name)
 	return nil
 }
 
