@@ -212,12 +212,6 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 
 	// TODO: when delete key job is done, we need to update the repository conditions: unlock it and update the number of keys
 
-	repo.Status.Keys--
-	err = r.Status().Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
 	key.Status.Conditions = []metav1.Condition{
 		{
 			Type:               v1.KeyDeleting,
@@ -360,12 +354,8 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 					Reason:             "RepositoryHasAtLeastOneKey",
 					Message:            "Repository has at least one secure key",
 				})
-			} else {
-				// Other key was added, so we increment the number of keys
-				repo.Status.Keys++
 			}
 		}
-		return r.Status().Update(ctx, repo)
 	}
 
 	return nil

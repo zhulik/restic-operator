@@ -78,9 +78,6 @@ type RepositoryStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// +optional
-	Keys int `json:"keys"`
-
-	// +optional
 	CreateJobName *string `json:"createJobName,omitempty"`
 }
 
@@ -88,7 +85,6 @@ type RepositoryStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
 // +kubebuilder:printcolumn:name="Status",type=string,description="status",JSONPath=`.status.conditions[0].type`
-// +kubebuilder:printcolumn:name="Keys",type=integer,description="keys",JSONPath=`.status.keys`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Repository is the Schema for the repositories API
