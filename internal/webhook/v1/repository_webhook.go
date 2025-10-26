@@ -49,6 +49,7 @@ func SetupRepositoryWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-restic-zhulik-wtf-v1-repository,mutating=false,failurePolicy=fail,sideEffects=None,groups=restic.zhulik.wtf,resources=repositories,verbs=create;update,versions=v1,name=vrepository-v1.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-restic-zhulik-wtf-v1-repository,mutating=true,failurePolicy=fail,sideEffects=None,groups=restic.zhulik.wtf,resources=repositories,verbs=create;update,versions=v1,name=mrepository-v1.kb.io,admissionReviewVersions=v1
 
 // RepositoryCustomValidator struct is responsible for validating the Repository resource
 // when it is created, updated, or deleted.
