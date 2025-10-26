@@ -23,10 +23,6 @@ spec:
       jsonPath: .status.conditions[0].type
       name: Status
       type: string
-    - description: keys
-      jsonPath: .status.keys
-      name: Keys
-      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -301,8 +297,6 @@ spec:
                 x-kubernetes-list-type: map
               createJobName:
                 type: string
-              keys:
-                type: integer
             type: object
         required:
         - spec
