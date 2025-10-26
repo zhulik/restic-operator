@@ -6,7 +6,6 @@ import (
 
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
-	"github.com/zhulik/restic-operator/internal/conditions"
 	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,9 +14,8 @@ import (
 )
 
 func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, deletedKey *v1.Key) (*batchv1.Job, error) {
-	statusType, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Creating", "Locked")
-	if ok {
-		return nil, fmt.Errorf("repository is in %s status, cannot delete key, should be retried", statusType)
+	if !repo.IsCreated() {
+		return nil, fmt.Errorf("repository is not yet created, cannot delete key, should be retried")
 	}
 
 	var keyList v1.KeyList
@@ -61,7 +59,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
-							Image:           imageName(repo),
+							Image:           repo.ImageName(),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             env,
 							Args:            args,

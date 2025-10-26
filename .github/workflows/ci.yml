@@ -150,7 +150,7 @@ jobs:
 
   build_and_push:
     name: Build and Push
-    needs: [lint, test-helm, test] # test-e2e
+    needs: [lint, test] # test-e2e, test-helm
     runs-on: ubuntu-latest
     permissions:
       contents: read

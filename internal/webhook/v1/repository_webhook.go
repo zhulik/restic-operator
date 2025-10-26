@@ -36,9 +36,10 @@ var repositorylog = logf.Log.WithName("repository-resource")
 
 // SetupRepositoryWebhookWithManager registers the webhook for Repository in the manager.
 func SetupRepositoryWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&resticv1.Repository{}).
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&resticv1.Repository{}).
 		WithValidator(&RepositoryCustomValidator{Client: mgr.GetClient()}).
-		WithDefaulter(&RepositoryCustomDefaulter{Client: mgr.GetClient()}).
+		WithDefaulter(&RepositoryCustomDefaulter{}).
 		Complete()
 }
 
@@ -58,9 +59,7 @@ type RepositoryCustomValidator struct {
 	Client client.Client
 }
 
-type RepositoryCustomDefaulter struct {
-	Client client.Client
-}
+type RepositoryCustomDefaulter struct{}
 
 var _ webhook.CustomValidator = &RepositoryCustomValidator{}
 var _ webhook.CustomDefaulter = &RepositoryCustomDefaulter{}
@@ -125,6 +124,8 @@ func (d *RepositoryCustomDefaulter) Default(ctx context.Context, obj runtime.Obj
 		return fmt.Errorf("expected a Repository object but got %T", obj)
 	}
 	repositorylog.Info("Defaulting for Repository", "name", repository.GetName())
+
+	repository.SetDefaults()
 
 	return nil
 }

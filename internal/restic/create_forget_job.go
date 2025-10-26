@@ -28,7 +28,7 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 							Containers: []corev1.Container{
 								{
 									Name:            "restic-init",
-									Image:           imageName(repo),
+									Image:           repo.ImageName(),
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									Env: slices.Concat(repo.Spec.Env, []corev1.EnvVar{
 										{

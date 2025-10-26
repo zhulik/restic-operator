@@ -30,7 +30,7 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
-							Image:           imageName(repo),
+							Image:           repo.ImageName(),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: slices.Concat([]corev1.EnvVar{
 								{

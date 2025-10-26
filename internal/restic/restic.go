@@ -8,11 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	Image     = "restic/restic"
-	LatestTag = "latest"
-)
-
 var podSecurityContext = &corev1.PodSecurityContext{
 	RunAsNonRoot: lo.ToPtr(true),
 	RunAsUser:    lo.ToPtr(int64(1000)),
@@ -27,16 +22,6 @@ var containerSecurityContext = &corev1.SecurityContext{
 		Drop: []corev1.Capability{"ALL"},
 	},
 	AllowPrivilegeEscalation: lo.ToPtr(false),
-}
-
-func imageName(repo *v1.Repository) string {
-	image := Image
-	tag := LatestTag
-	if repo.Spec.Version != "" {
-		tag = repo.Spec.Version
-	}
-	image += ":" + tag
-	return image
 }
 
 func jobEnv(repo *v1.Repository, key *v1.Key) []corev1.EnvVar {

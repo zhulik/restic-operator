@@ -12,29 +12,22 @@ import (
 
 	"github.com/samber/lo"
 	v1 "github.com/zhulik/restic-operator/api/v1"
-	"github.com/zhulik/restic-operator/internal/conditions"
 	"github.com/zhulik/restic-operator/internal/labels"
 )
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	if len(repo.Status.Conditions) == 0 {
-		return nil, fmt.Errorf("repository condition is unknown, cannot add key, should be retried")
+	if !repo.IsCreated() {
+		return nil, fmt.Errorf("repository is not yet created, cannot add key, should be retried")
 	}
 
-	_, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, v1.RepositoryCreating)
-	if ok {
-		return nil, fmt.Errorf("repository still creating, cannot add key, should be retried")
-	}
-
-	_, ok = conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Secure")
-	if !ok {
+	if !repo.IsSecure() {
 		return addFirstKey(repo, addedKey)
 	}
 
 	// If the repository already has keys, we pick the first one that came along to open the repo and add the new key
 	var keyList v1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
-		"restic.zhulik.wtf/repository": repo.Name,
+		labels.Repository: repo.Name,
 	})
 	if err != nil {
 		return nil, err
@@ -73,7 +66,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
-							Image:           imageName(repo),
+							Image:           repo.ImageName(),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env:             jobEnv(repo, addedKey),
 							Command:         []string{"/bin/sh", "-c"},
@@ -129,7 +122,7 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
-							Image:           imageName(repo),
+							Image:           repo.ImageName(),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: slices.Concat(jobEnv(repo, addedKey), []corev1.EnvVar{
 								{

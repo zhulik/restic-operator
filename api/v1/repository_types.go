@@ -17,15 +17,22 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
+	"github.com/zhulik/restic-operator/internal/conditions"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	RepositoryCreated  = "Created"
-	RepositoryFailed   = "Failed"
-	RepositoryCreating = "Creating"
-	RepositorySecure   = "Secure"
+	RepositoryCreated = "Created"
+	RepositoryFailed  = "Failed"
+	RepositorySecure  = "Secure"
+)
+
+const (
+	Image     = "restic/restic"
+	LatestTag = "latest"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -102,6 +109,87 @@ type Repository struct {
 	// status defines the observed state of Repository
 	// +optional
 	Status RepositoryStatus `json:"status,omitempty,omitzero"`
+}
+
+func (r *Repository) SetDefaults() {
+	if r.Spec.Version == "" {
+		r.Spec.Version = LatestTag
+	}
+
+	if r.Status.Conditions == nil {
+		r.Status.Conditions = []metav1.Condition{
+			{
+				Type:               RepositoryCreated,
+				Status:             metav1.ConditionFalse,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryInitializing",
+				Message:            "Repository is being initialized",
+			},
+			{
+				Type:               RepositorySecure,
+				Status:             metav1.ConditionFalse,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryHasNoKeys",
+				Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
+			},
+			{
+				Type:               RepositoryFailed,
+				Status:             metav1.ConditionFalse,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryInitializationJobNotStarted",
+				Message:            "Repository initialization job has not been started yet",
+			},
+		}
+	}
+}
+
+func (r *Repository) IsCreated() bool {
+	_, ok := conditions.ContainsAnyTrueCondition(r.Status.Conditions, RepositoryCreated)
+	return ok
+}
+
+func (r *Repository) IsSecure() bool {
+	_, ok := conditions.ContainsAnyTrueCondition(r.Status.Conditions, RepositorySecure)
+	return ok
+}
+
+func (r *Repository) IsFailed() bool {
+	_, ok := conditions.ContainsAnyTrueCondition(r.Status.Conditions, RepositoryFailed)
+	return ok
+}
+
+func (r *Repository) SetFailedCondition(message string) {
+	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositoryFailed, metav1.Condition{
+		Type:               RepositoryFailed,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryInitializationFailed",
+		Message:            "Repository initialization job failed: " + message,
+	})
+}
+
+func (r *Repository) SetCreatedCondition() {
+	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositoryCreated, metav1.Condition{
+		Type:               RepositoryCreated,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryCreated",
+		Message:            "Repository initialization job successfully completed",
+	})
+}
+
+func (r *Repository) SetSecureCondition() {
+	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositorySecure, metav1.Condition{
+		Type:               RepositorySecure,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryHasAtLeastOneKey",
+		Message:            "Repository has at least one key added to it",
+	})
+}
+
+func (r *Repository) ImageName() string {
+	return fmt.Sprintf("%s:%s", Image, r.Spec.Version)
 }
 
 // +kubebuilder:object:root=true

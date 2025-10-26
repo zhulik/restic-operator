@@ -22,7 +22,6 @@ import (
 	"github.com/zhulik/restic-operator/internal/conditions"
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -59,7 +58,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, resticv1.RepositoryCreated, resticv1.RepositoryFailed); ok {
+	if repo.IsCreated() || repo.IsFailed() {
 		return ctrl.Result{}, nil
 	}
 
@@ -88,34 +87,12 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 				return err
 			}
 
-			repo.Status.Conditions = []metav1.Condition{
-				{
-					Type:               resticv1.RepositoryFailed,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryInitializationJobFailed",
-					Message:            logs,
-				},
-			}
+			repo.SetFailedCondition(logs)
 
 		case batchv1.JobComplete:
 			l.Info("Create job successfully completed, updating repository status")
-			repo.Status.Conditions = []metav1.Condition{
-				{
-					Type:               resticv1.RepositoryCreated,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryInitializationJobCompleted",
-					Message:            "Repository initialization job successfully completed",
-				},
-				{
-					Type:               resticv1.RepositorySecure,
-					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryHasNoKeys",
-					Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
-				},
-			}
+			repo.SetCreatedCondition()
+			repo.SetSecureCondition()
 		}
 
 		repo.Status.CreateJobName = nil
@@ -136,15 +113,6 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 		return err
 	}
 
-	repo.Status.Conditions = []metav1.Condition{
-		{
-			Type:               resticv1.RepositoryCreating,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "RepositoryInitializationStarted",
-			Message:            "Repository initialization job created",
-		},
-	}
 	repo.Status.CreateJobName = &job.Name
 
 	err := r.Status().Update(ctx, repo)
