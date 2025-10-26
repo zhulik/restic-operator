@@ -72,7 +72,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if !key.DeletionTimestamp.IsZero() && key.Status.ActiveJobName == nil {
+	if !key.DeletionTimestamp.IsZero() {
 		l.Info("Key is being deleted")
 
 		err = r.deleteKey(ctx, l, key)
