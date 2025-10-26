@@ -123,7 +123,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Message:            "Repository is not locked, this has nothing to with restic repository locking, it's used for restic-operator internal concurrency control",
 				},
 			}
-			repo.Status.Keys = 1 // When created with --insecure-no-password, a key is automatically created
 		}
 
 		repo.Status.CreateJobName = nil

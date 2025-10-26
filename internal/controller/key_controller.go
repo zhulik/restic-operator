@@ -246,12 +246,6 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 
 	// TODO: when delete key job is done, we need to update the repository conditions: unlock it and update the number of keys
 
-	repo.Status.Keys--
-	err = r.Status().Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
 	key.Status.Conditions = []metav1.Condition{
 		{
 			Type:               v1.KeyDeleting,
@@ -394,9 +388,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 					Reason:             "RepositoryHasAtLeastOneKey",
 					Message:            "Repository has at least one secure key",
 				})
-			} else {
-				// Other key was added, so we increment the number of keys
-				repo.Status.Keys++
 			}
 		}
 		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositoryLocked, metav1.Condition{
@@ -406,11 +397,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			Reason:             "RepositoryIsNotLocked",
 			Message:            "Repository is not locked, this has nothing to with restic repository locking, it's used for restic-operator internal concurrency control",
 		})
-		err = r.Status().Update(ctx, key)
-		if err != nil {
-			return err
-		}
-		return r.Status().Update(ctx, repo)
 	}
 
 	return nil
