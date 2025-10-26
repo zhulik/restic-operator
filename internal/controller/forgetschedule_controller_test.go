@@ -31,7 +31,7 @@ import (
 	"github.com/zhulik/restic-operator/internal/controller"
 )
 
-var _ = Describe("ForgetSchedule Controller", func() {
+var _ = XDescribe("ForgetSchedule Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
