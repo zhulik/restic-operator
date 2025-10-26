@@ -1,0 +1,9 @@
+apiVersion: restic.zhulik.wtf/v1
+kind: ForgetSchedule
+metadata:
+  labels:
+    app.kubernetes.io/name: restic-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: forgetschedule-sample
+spec:
+  # TODO(user): Add fields here

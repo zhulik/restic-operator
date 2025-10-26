@@ -4,6 +4,7 @@
 resources:
 - bases/restic.zhulik.wtf_repositories.yaml
 - bases/restic.zhulik.wtf_keys.yaml
+- bases/restic.zhulik.wtf_forgetschedules.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

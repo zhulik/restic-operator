@@ -3,4 +3,5 @@ resources:
 - repository_key.yaml
 - restic_v1_repository.yaml
 - restic_v1_key.yaml
+- restic_v1_forgetschedule.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

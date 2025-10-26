@@ -115,6 +115,9 @@ var _ = BeforeSuite(func() {
 	err = SetupKeyWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = SetupForgetScheduleWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:webhook
 
 	go func() {

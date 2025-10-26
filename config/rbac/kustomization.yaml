@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the restic-operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- forgetschedule_admin_role.yaml
+- forgetschedule_editor_role.yaml
+- forgetschedule_viewer_role.yaml
 - key_admin_role.yaml
 - key_editor_role.yaml
 - key_viewer_role.yaml
