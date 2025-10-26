@@ -73,7 +73,7 @@ spec:
               keepYearly:
                 minimum: 1
                 type: integer
-              keyName:
+              key:
                 minLength: 1
                 type: string
               prune:
@@ -85,7 +85,7 @@ spec:
                 minLength: 9
                 type: string
             required:
-            - keyName
+            - key
             - repository
             - schedule
             type: object

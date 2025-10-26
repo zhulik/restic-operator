@@ -46,7 +46,7 @@ type ForgetScheduleSpec struct {
 
 	// +required
 	// +kubebuilder:validation:MinLength=1
-	Key string `json:"keyName"`
+	Key string `json:"key"`
 
 	// +optional
 	Prune bool `json:"prune,omitempty"`

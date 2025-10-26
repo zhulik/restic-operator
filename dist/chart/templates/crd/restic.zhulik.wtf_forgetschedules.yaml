@@ -20,7 +20,23 @@ spec:
     singular: forgetschedule
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: repository
+      jsonPath: .spec.repository
+      name: Repository
+      type: string
+    - description: status
+      jsonPath: .status.conditions[0].type
+      name: Status
+      type: string
+    - description: key
+      jsonPath: .spec.key
+      name: Key
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: ForgetSchedule is the Schema for the forgetschedules API
@@ -63,6 +79,9 @@ spec:
               keepYearly:
                 minimum: 1
                 type: integer
+              key:
+                minLength: 1
+                type: string
               prune:
                 type: boolean
               repository:
@@ -72,6 +91,7 @@ spec:
                 minLength: 9
                 type: string
             required:
+            - key
             - repository
             - schedule
             type: object
