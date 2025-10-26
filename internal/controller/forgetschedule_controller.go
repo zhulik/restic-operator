@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -26,7 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/restic"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ForgetScheduleReconciler reconciles a ForgetSchedule object
@@ -40,6 +45,7 @@ type ForgetScheduleReconciler struct {
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules/finalizers,verbs=update
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -51,11 +57,87 @@ type ForgetScheduleReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	l := logf.FromContext(ctx)
 
-	// TODO(user): your logic here
+	forgetSchedule := &resticv1.ForgetSchedule{}
+	err := r.Get(ctx, req.NamespacedName, forgetSchedule)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
-	return ctrl.Result{}, nil
+	if !forgetSchedule.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
+
+	repo := &resticv1.Repository{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.Spec.Repository}, repo)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Info("Repository not found, will retry", "repository", forgetSchedule.Spec.Repository)
+		}
+		return ctrl.Result{}, err
+	}
+
+	key := &resticv1.Key{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.Spec.Key}, key)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Info("Key not found, will retry", "key", forgetSchedule.Spec.Key)
+		}
+		return ctrl.Result{}, err
+	}
+
+	keySecret := &corev1.Secret{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.SecretName()}, keySecret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Info("Key secret not found, will retry", "key", key.Name)
+		}
+		return ctrl.Result{}, err
+	}
+
+	cronJob := &batchv1.CronJob{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.JobName()}, cronJob)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if err := ctrl.SetControllerReference(repo, forgetSchedule, r.Scheme); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, r.createForgetJob(ctx, l, forgetSchedule, repo, keySecret)
+		}
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, r.updateForgetJob(ctx, l, forgetSchedule, repo, keySecret)
+}
+
+func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
+	l.Info("Creating forget job")
+	job, err := restic.CreateForgetJob(ctx, forgetSchedule, repo, keySecret)
+	if err != nil {
+		return err
+	}
+
+	if err := ctrl.SetControllerReference(forgetSchedule, job, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.Create(ctx, job)
+}
+
+func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
+	l.Info("Updating forget job")
+	job, err := restic.CreateForgetJob(ctx, forgetSchedule, repo, keySecret)
+	if err != nil {
+		return err
+	}
+
+	if err := ctrl.SetControllerReference(forgetSchedule, job, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.Update(ctx, job)
 }
 
 // SetupWithManager sets up the controller with the Manager.

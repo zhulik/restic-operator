@@ -10,6 +10,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-restic-zhulik-wtf-v1-forgetschedule
+  failurePolicy: Fail
+  name: vforgetschedule-v1.kb.io
+  rules:
+  - apiGroups:
+    - restic.zhulik.wtf
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - forgetschedules
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-restic-zhulik-wtf-v1-key
   failurePolicy: Fail
   name: vkey-v1.kb.io

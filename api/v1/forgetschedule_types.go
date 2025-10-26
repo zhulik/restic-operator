@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,9 +32,44 @@ type ForgetScheduleSpec struct {
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
-	// foo is an example field of ForgetSchedule. Edit forgetschedule_types.go to remove/update
+	// +required
+	// +kubebuilder:validation:MinLength=9
+	Schedule string `json:"schedule"`
+
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Repository string `json:"repository"`
+
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Key string `json:"keyName"`
+
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	Prune bool `json:"prune,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepLast int `json:"keepLast,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepHourly int `json:"keepHourly,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepDaily int `json:"keepDaily,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepWeekly int `json:"keepWeekly,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepMonthly int `json:"keepMonthly,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	KeepYearly int `json:"keepYearly,omitempty"`
 }
 
 // ForgetScheduleStatus defines the observed state of ForgetSchedule.
@@ -76,6 +113,10 @@ type ForgetSchedule struct {
 	// status defines the observed state of ForgetSchedule
 	// +optional
 	Status ForgetScheduleStatus `json:"status,omitempty,omitzero"`
+}
+
+func (f *ForgetSchedule) JobName() string {
+	return fmt.Sprintf("forget-%s", f.Name)
 }
 
 // +kubebuilder:object:root=true

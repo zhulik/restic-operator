@@ -37,6 +37,18 @@ rules:
 - apiGroups:
   - batch
   resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
   - jobs
   verbs:
   - create
@@ -46,6 +58,7 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - forgetschedules
   - keys
   - repositories
   verbs:
@@ -59,6 +72,7 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - forgetschedules/finalizers
   - keys/finalizers
   - repositories/finalizers
   verbs:
@@ -66,6 +80,7 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
+  - forgetschedules/status
   - keys/status
   - repositories/status
   verbs:
