@@ -22,6 +22,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var (
+	ForgetScheduleCreated = "Created"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -97,6 +101,10 @@ type ForgetScheduleStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
+// +kubebuilder:printcolumn:name="Status",type=string,description="status",JSONPath=`.status.conditions[0].type`
+// +kubebuilder:printcolumn:name="Key",type=string,description="key",JSONPath=`.spec.key`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ForgetSchedule is the Schema for the forgetschedules API
 type ForgetSchedule struct {

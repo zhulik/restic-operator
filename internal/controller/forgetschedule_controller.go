@@ -20,6 +20,7 @@ import (
 	"context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -114,7 +115,7 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
 	l.Info("Creating forget job")
-	job, err := restic.CreateForgetJob(ctx, forgetSchedule, repo, keySecret)
+	job, err := restic.CreateForgetJob(forgetSchedule, repo, keySecret)
 	if err != nil {
 		return err
 	}
@@ -123,12 +124,26 @@ func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.L
 		return err
 	}
 
-	return r.Create(ctx, job)
+	if err := r.Create(ctx, job); err != nil {
+		return err
+	}
+
+	forgetSchedule.Status.Conditions = []metav1.Condition{
+		{
+			Type:               resticv1.ForgetScheduleCreated,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "ForgetScheduleCreated",
+			Message:            "Forget schedule CronJob created",
+		},
+	}
+
+	return r.Status().Update(ctx, forgetSchedule)
 }
 
 func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
 	l.Info("Updating forget job")
-	job, err := restic.CreateForgetJob(ctx, forgetSchedule, repo, keySecret)
+	job, err := restic.CreateForgetJob(forgetSchedule, repo, keySecret)
 	if err != nil {
 		return err
 	}

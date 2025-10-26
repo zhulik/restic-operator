@@ -1,7 +1,6 @@
 package restic
 
 import (
-	"context"
 	"slices"
 	"strconv"
 
@@ -11,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateForgetJob(ctx context.Context, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) (*batchv1.CronJob, error) {
+func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) (*batchv1.CronJob, error) {
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      forgetSchedule.JobName(),
