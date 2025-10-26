@@ -17,7 +17,11 @@ import (
 )
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
-	statusType, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Creating", "Locked")
+	if len(repo.Status.Conditions) == 0 {
+		return nil, fmt.Errorf("repository condition is unknown, cannot add key, should be retried")
+	}
+
+	statusType, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, v1.RepositoryCreating, v1.RepositoryLocked)
 	if ok {
 		return nil, fmt.Errorf("repository is in %s status, cannot add key, should be retried", statusType)
 	}
