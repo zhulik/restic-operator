@@ -174,19 +174,6 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 		return err
 	}
 
-	repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositoryLocked, metav1.Condition{
-		Type:               v1.RepositoryLocked,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "RepositoryIsLocked",
-		Message:            "Repository is locked, this has nothing to do with restic repository locking, it's used for restic-operator internal concurrency control",
-	})
-
-	err = r.Status().Update(ctx, repo)
-	if err != nil {
-		return err
-	}
-
 	l.Info("Created key creation job", "job", job.Name)
 	return nil
 }
@@ -222,14 +209,6 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 	if err := r.Create(ctx, job); err != nil {
 		return err
 	}
-
-	repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositoryLocked, metav1.Condition{
-		Type:               v1.RepositoryLocked,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "RepositoryIsLocked",
-		Message:            "Repository is locked, this has nothing to do with restic repository locking, it's used for restic-operator internal concurrency control",
-	})
 
 	// TODO: when delete key job is done, we need to update the repository conditions: unlock it and update the number of keys
 
@@ -385,17 +364,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				// Other key was added, so we increment the number of keys
 				repo.Status.Keys++
 			}
-		}
-		repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositoryLocked, metav1.Condition{
-			Type:               v1.RepositoryLocked,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "RepositoryIsNotLocked",
-			Message:            "Repository is not locked, this has nothing to with restic repository locking, it's used for restic-operator internal concurrency control",
-		})
-		err = r.Status().Update(ctx, key)
-		if err != nil {
-			return err
 		}
 		return r.Status().Update(ctx, repo)
 	}

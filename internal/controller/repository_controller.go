@@ -115,13 +115,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 					Reason:             "RepositoryHasNoKeys",
 					Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
 				},
-				{
-					Type:               resticv1.RepositoryLocked,
-					Status:             metav1.ConditionFalse,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryIsNotLocked",
-					Message:            "Repository is not locked, this has nothing to with restic repository locking, it's used for restic-operator internal concurrency control",
-				},
 			}
 			repo.Status.Keys = 1 // When created with --insecure-no-password, a key is automatically created
 		}

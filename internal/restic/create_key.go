@@ -21,9 +21,9 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 		return nil, fmt.Errorf("repository condition is unknown, cannot add key, should be retried")
 	}
 
-	statusType, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, v1.RepositoryCreating, v1.RepositoryLocked)
+	_, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, v1.RepositoryCreating)
 	if ok {
-		return nil, fmt.Errorf("repository is in %s status, cannot add key, should be retried", statusType)
+		return nil, fmt.Errorf("repository still creating, cannot add key, should be retried")
 	}
 
 	_, ok = conditions.ContainsAnyTrueCondition(repo.Status.Conditions, "Secure")

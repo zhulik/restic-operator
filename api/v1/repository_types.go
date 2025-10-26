@@ -25,7 +25,6 @@ const (
 	RepositoryCreated  = "Created"
 	RepositoryFailed   = "Failed"
 	RepositoryCreating = "Creating"
-	RepositoryLocked   = "Locked"
 	RepositorySecure   = "Secure"
 )
 
