@@ -82,6 +82,10 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
+	if key.Status.KeyID != nil {
+		return ctrl.Result{}, nil
+	}
+
 	repo := &v1.Repository{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
 	if err != nil {
@@ -96,20 +100,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	if key.Status.KeyID != nil {
-		return ctrl.Result{}, nil
-	}
-
-	if controllerutil.AddFinalizer(key, finalizer) {
-		l.Info("add finalizer")
-
-		err = r.Update(ctx, key)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	l.Info("Key ID is not set, creating a new key")
+	controllerutil.AddFinalizer(key, finalizer)
 
 	err = ctrl.SetControllerReference(repo, key, r.Scheme)
 	if err != nil {
@@ -123,10 +114,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	err = r.Update(ctx, key)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-
-	if _, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, v1.KeyCreating, v1.KeyFailed); ok {
-		return ctrl.Result{}, nil
 	}
 
 	key.Status.Conditions = []metav1.Condition{

@@ -59,13 +59,13 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, resticv1.RepositoryCreated, resticv1.RepositoryFailed); ok {
+		return ctrl.Result{}, nil
+	}
+
 	if repo.Status.CreateJobName != nil {
 		err = r.checkCreateJobStatus(ctx, l, repo)
 		return ctrl.Result{}, err
-	}
-
-	if _, ok := conditions.ContainsAnyTrueCondition(repo.Status.Conditions, resticv1.RepositoryCreated, resticv1.RepositoryFailed); ok {
-		return ctrl.Result{}, nil
 	}
 
 	err = r.startCreateRepoJob(ctx, l, repo)
