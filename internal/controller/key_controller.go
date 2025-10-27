@@ -86,8 +86,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	repo := &v1.Repository{}
-	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	repo, err := r.getRepository(ctx, key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
@@ -179,8 +178,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 }
 
 func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Key) error {
-	repo := &v1.Repository{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	repo, err := r.getRepository(ctx, key)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
@@ -291,83 +289,76 @@ func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger,
 		return err
 	}
 
-	if conditionType, ok := conditions.ContainsAnyTrueCondition(key.Status.Conditions, v1.KeyCreating, v1.KeyDeleting); ok {
-		switch conditionType {
-		case v1.KeyCreating:
-			return r.checkCreateJobStatus(ctx, l, repo, key)
-		case v1.KeyDeleting:
-			return r.checkDeleteJobStatus(ctx, l, key)
+	conditionType, inCondition := conditions.ContainsAnyTrueCondition(key.Status.Conditions, v1.KeyCreating, v1.KeyDeleting)
+	if !inCondition {
+		return nil
+	}
+
+	switch conditionType {
+	case v1.KeyCreating:
+		return r.checkCreateJobStatus(ctx, l, repo, key, job)
+	case v1.KeyDeleting:
+		return r.checkDeleteJobStatus(ctx, l, key, job)
+	}
+
+	return nil
+}
+
+func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *v1.Repository, key *v1.Key, job *batchv1.Job) error {
+	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
+	if !inCondition {
+		return nil
+	}
+	logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+	if err != nil {
+		return err
+	}
+
+	switch conditionType {
+	case batchv1.JobFailed:
+		key.Status.Conditions = []metav1.Condition{
+			{
+				Type:               v1.KeyFailed,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "KeyCreationJobFailed",
+				Message:            logs,
+			},
+		}
+
+		key.Status.ActiveJobName = nil
+	case batchv1.JobComplete:
+		key.Status.Conditions = []metav1.Condition{
+			{
+				Type:               v1.KeyCreated,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "KeyCreationJobCompleted",
+				Message:            "Key creation job successfully completed",
+			},
+		}
+
+		key.Status.ActiveJobName = nil
+		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
+		l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
+
+		// First key was added, so we can mark the repository as secure
+		firstKey := job.Labels[labels.FirstKey] == "true"
+		if firstKey {
+			repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositorySecure, metav1.Condition{
+				Type:               v1.RepositorySecure,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "RepositoryHasAtLeastOneKey",
+				Message:            "Repository has at least one secure key",
+			})
 		}
 	}
 
 	return nil
 }
 
-func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *v1.Repository, key *v1.Key) error {
-	job := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
-	if err != nil {
-		return err
-	}
-
-	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
-		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-		if err != nil {
-			return err
-		}
-
-		switch conditionType {
-		case batchv1.JobFailed:
-			key.Status.Conditions = []metav1.Condition{
-				{
-					Type:               v1.KeyFailed,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "KeyCreationJobFailed",
-					Message:            logs,
-				},
-			}
-
-			key.Status.ActiveJobName = nil
-		case batchv1.JobComplete:
-			key.Status.Conditions = []metav1.Condition{
-				{
-					Type:               v1.KeyCreated,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "KeyCreationJobCompleted",
-					Message:            "Key creation job successfully completed",
-				},
-			}
-
-			key.Status.ActiveJobName = nil
-			key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
-			l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
-
-			// First key was added, so we can mark the repository as secure
-			firstKey := job.Labels[labels.FirstKey] == "true"
-			if firstKey {
-				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositorySecure, metav1.Condition{
-					Type:               v1.RepositorySecure,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             "RepositoryHasAtLeastOneKey",
-					Message:            "Repository has at least one secure key",
-				})
-			}
-		}
-	}
-
-	return nil
-}
-
-func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *v1.Key) error {
-	job := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
-	if err != nil {
-		return err
-	}
-
+func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *v1.Key, job *batchv1.Job) error {
 	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		switch conditionType {
 		case batchv1.JobFailed:
@@ -392,6 +383,15 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 	}
 
 	return nil
+}
+
+func (r *KeyReconciler) getRepository(ctx context.Context, key *v1.Key) (*v1.Repository, error) {
+	repo := &v1.Repository{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
+	if err != nil {
+		return nil, err
+	}
+	return repo, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

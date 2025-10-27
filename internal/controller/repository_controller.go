@@ -88,36 +88,36 @@ func (r *RepositoryReconciler) getCreateRepoJob(ctx context.Context, repo *resti
 }
 
 func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, job *batchv1.Job) error {
-	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
-		switch conditionType {
-		case batchv1.JobFailed:
-			l.Info("Create job failed, updating repository status")
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return err
-			}
-
-			repo.SetFailedCondition(logs)
-
-			r.Recorder.Eventf(repo,
-				"Warning", "RepositoryInitializationJobFailed",
-				"Repository initialization job %s failed: %s", job.Name, logs,
-			)
-
-		case batchv1.JobComplete:
-			l.Info("Create job successfully completed, updating repository status")
-			repo.SetCreatedCondition()
-
-			r.Recorder.Eventf(repo,
-				"Normal", "RepositoryInitializationJobCompleted",
-				"Repository initialization job %s successfully completed", job.Name,
-			)
+	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
+	if !inCondition {
+		return nil
+	}
+	switch conditionType {
+	case batchv1.JobFailed:
+		l.Info("Create job failed, updating repository status")
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return err
 		}
 
-		return r.Status().Update(ctx, repo)
+		repo.SetFailedCondition(logs)
+
+		r.Recorder.Eventf(repo,
+			"Warning", "RepositoryInitializationJobFailed",
+			"Repository initialization job %s failed: %s", job.Name, logs,
+		)
+
+	case batchv1.JobComplete:
+		l.Info("Create job successfully completed, updating repository status")
+		repo.SetCreatedCondition()
+
+		r.Recorder.Eventf(repo,
+			"Normal", "RepositoryInitializationJobCompleted",
+			"Repository initialization job %s successfully completed", job.Name,
+		)
 	}
 
-	return nil
+	return r.Status().Update(ctx, repo)
 }
 
 func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
