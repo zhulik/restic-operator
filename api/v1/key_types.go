@@ -80,7 +80,8 @@ type KeyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
-// +kubebuilder:printcolumn:name="Status",type=string,description="status",JSONPath=`.status.conditions[0].type`
+// +kubebuilder:printcolumn:name="Created",type=string,description="created",JSONPath=`.status.conditions[?(@.type == 'Created')].status`
+// +kubebuilder:printcolumn:name="Failed",type=string,description="failed",JSONPath=`.status.conditions[?(@.type == 'Failed')].status`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Key is the Schema for the keys API
