@@ -52,7 +52,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "add-key-",
 			Namespace:    repo.Namespace,
-			Annotations: map[string]string{
+			Labels: map[string]string{
 				labels.FirstKey:   "true",
 				labels.Key:        addedKey.Name,
 				labels.Repository: repo.Name,
@@ -108,7 +108,7 @@ func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Jo
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "add-key-",
 			Namespace:    repo.Namespace,
-			Annotations: map[string]string{
+			Labels: map[string]string{
 				labels.FirstKey:   "false",
 				labels.Key:        addedKey.Name,
 				labels.Repository: repo.Name,

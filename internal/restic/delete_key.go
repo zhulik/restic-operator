@@ -45,7 +45,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "delete-key-",
 			Namespace:    repo.Namespace,
-			Annotations: map[string]string{
+			Labels: map[string]string{
 				labels.FirstKey:   "true",
 				labels.Key:        deletedKey.Name,
 				labels.Repository: repo.Name,

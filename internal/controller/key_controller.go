@@ -345,7 +345,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 			l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
 
 			// First key was added, so we can mark the repository as secure
-			firstKey := job.Annotations[labels.FirstKey] == "true"
+			firstKey := job.Labels[labels.FirstKey] == "true"
 			if firstKey {
 				repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositorySecure, metav1.Condition{
 					Type:               v1.RepositorySecure,
