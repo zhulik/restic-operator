@@ -19,9 +19,17 @@ spec:
       jsonPath: .spec.repository
       name: Repository
       type: string
-    - description: status
-      jsonPath: .status.conditions[0].type
-      name: Status
+    - description: created
+      jsonPath: ".status.conditions[?(@.type == 'Created\t')].status"
+      name: Created
+      type: string
+    - description: failed
+      jsonPath: .status.conditions[?(@.type == 'Failed')].status
+      name: Failed
+      type: string
+    - description: secure
+      jsonPath: .status.conditions[?(@.type == 'Secure')].status
+      name: Secure
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
