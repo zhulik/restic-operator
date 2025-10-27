@@ -139,6 +139,44 @@ func (k Key) IsFailed() bool {
 	return ok
 }
 
+func (k *Key) SetFailedCondition(message string) {
+	k.Status.Conditions, _ = conditions.UpdateCondition(k.Status.Conditions, KeyFailed, metav1.Condition{
+		Type:               KeyFailed,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "KeyCreationFailed",
+		Message:            "Key creation job failed: " + message,
+	})
+
+	k.Status.Conditions, _ = conditions.UpdateCondition(k.Status.Conditions, KeyCreated, metav1.Condition{
+		Type:               KeyCreated,
+		Status:             metav1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "KeyCreationFailed",
+		Message:            "Key creation job failed: " + message,
+	})
+}
+
+func (k *Key) SetCreatedCondition(keyID string) {
+	k.Status.Conditions, _ = conditions.UpdateCondition(k.Status.Conditions, KeyCreated, metav1.Condition{
+		Type:               KeyCreated,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "KeyCreated",
+		Message:            "Key creation job successfully completed",
+	})
+
+	k.Status.Conditions, _ = conditions.UpdateCondition(k.Status.Conditions, KeyFailed, metav1.Condition{
+		Type:               KeyFailed,
+		Status:             metav1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "KeyCreated",
+		Message:            "Key creation job successfully completed",
+	})
+
+	k.Status.KeyID = &keyID
+}
+
 // +kubebuilder:object:root=true
 
 // KeyList contains a list of Key

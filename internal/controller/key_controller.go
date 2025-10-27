@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/sethvargo/go-password/password"
@@ -105,8 +104,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
 	}
 
 	if !key.DeletionTimestamp.IsZero() {
@@ -279,30 +276,13 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 
 	switch conditionType {
 	case batchv1.JobFailed:
-		key.Status.Conditions = []metav1.Condition{
-			{
-				Type:               resticv1.KeyFailed,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "KeyCreationJobFailed",
-				Message:            logs,
-			},
-		}
+		key.SetFailedCondition(logs)
 	case batchv1.JobComplete:
-		key.Status.Conditions = []metav1.Condition{
-			{
-				Type:               resticv1.KeyCreated,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "KeyCreationJobCompleted",
-				Message:            "Key creation job successfully completed",
-			},
-		}
-		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
+		key.SetCreatedCondition(keyIDRegex.FindStringSubmatch(logs)[1])
 		l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
 	}
 
-	return nil
+	return r.Status().Update(ctx, key)
 }
 
 func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
