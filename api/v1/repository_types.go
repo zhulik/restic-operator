@@ -129,22 +129,22 @@ func (r *Repository) SetDefaultConditions() {
 			Type:               RepositoryCreated,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
-			Reason:             "RepositoryInitializing",
-			Message:            "Repository is being initialized",
+			Reason:             "RepositoryNotCreated",
+			Message:            "Repository is not yet created",
 		},
 		{
 			Type:               RepositorySecure,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "RepositoryHasNoKeys",
-			Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
+			Message:            "Repository created without keys. A key needs to be added to the repository to make it secure.",
 		},
 		{
 			Type:               RepositoryFailed,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
-			Reason:             "RepositoryInitializationJobNotStarted",
-			Message:            "Repository initialization job has not been started yet",
+			Reason:             "RepositoryCreationNotStarted",
+			Message:            "Repository creation is not yet started",
 		},
 	}
 }
