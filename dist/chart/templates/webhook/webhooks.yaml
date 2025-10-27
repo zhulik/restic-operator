@@ -31,7 +31,6 @@ webhooks:
           - v1
         resources:
           - repositories
-          - repositories/status
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
