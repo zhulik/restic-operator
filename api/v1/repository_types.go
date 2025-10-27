@@ -170,12 +170,28 @@ func (r *Repository) SetFailedCondition(message string) {
 		Reason:             "RepositoryInitializationFailed",
 		Message:            "Repository initialization job failed: " + message,
 	})
+
+	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositoryCreated, metav1.Condition{
+		Type:               RepositoryCreated,
+		Status:             metav1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryInitializationFailed",
+		Message:            "Repository initialization job failed: " + message,
+	})
 }
 
 func (r *Repository) SetCreatedCondition() {
 	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositoryCreated, metav1.Condition{
 		Type:               RepositoryCreated,
 		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "RepositoryCreated",
+		Message:            "Repository initialization job successfully completed",
+	})
+
+	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositoryFailed, metav1.Condition{
+		Type:               RepositoryFailed,
+		Status:             metav1.ConditionFalse,
 		LastTransitionTime: metav1.Now(),
 		Reason:             "RepositoryCreated",
 		Message:            "Repository initialization job successfully completed",

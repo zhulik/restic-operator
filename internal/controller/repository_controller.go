@@ -99,7 +99,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 		case batchv1.JobComplete:
 			l.Info("Create job successfully completed, updating repository status")
 			repo.SetCreatedCondition()
-			repo.SetSecureCondition()
 
 			r.Recorder.Eventf(repo,
 				"Normal", "RepositoryInitializationJobCompleted",
