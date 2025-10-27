@@ -113,7 +113,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if !key.DeletionTimestamp.IsZero() {
 		l.Info("Key is being deleted")
 
-		err = r.deleteKey(ctx, l, key)
+		err = r.deleteKey(ctx, l, repo, key)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
