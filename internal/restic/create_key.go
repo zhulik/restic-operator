@@ -11,11 +11,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/samber/lo"
-	v1 "github.com/zhulik/restic-operator/api/v1"
+	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/labels"
 )
 
-func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
+func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv1.Job, error) {
 	if !repo.IsCreated() {
 		return nil, fmt.Errorf("repository is not yet created, cannot add key, should be retried")
 	}
@@ -25,7 +25,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 	}
 
 	// If the repository already has keys, we pick the first one that came along to open the repo and add the new key
-	var keyList v1.KeyList
+	var keyList resticv1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace), client.MatchingLabels{
 		labels.Repository: repo.Name,
 	})
@@ -36,7 +36,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 		return nil, fmt.Errorf("no keys found for repository %s", repo.Name)
 	}
 
-	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
+	openKey, ok := lo.Find(keyList.Items, func(key resticv1.Key) bool {
 		// We don't want to use the key that we're adding
 		return key.Name != addedKey.Name
 	})
@@ -47,7 +47,7 @@ func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Rep
 
 }
 
-func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
+func addFirstKey(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv1.Job, error) {
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "add-key-",
@@ -103,7 +103,7 @@ func addFirstKey(repo *v1.Repository, addedKey *v1.Key) (*batchv1.Job, error) {
 	}, nil
 }
 
-func addKey(repo *v1.Repository, addedKey *v1.Key, openKey *v1.Key) (*batchv1.Job, error) {
+func addKey(repo *resticv1.Repository, addedKey *resticv1.Key, openKey *resticv1.Key) (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "add-key-",

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
-	v1 "github.com/zhulik/restic-operator/api/v1"
+	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,18 +13,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *v1.Repository, deletedKey *v1.Key) (*batchv1.Job, error) {
+func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, deletedKey *resticv1.Key) (*batchv1.Job, error) {
 	if !repo.IsCreated() {
 		return nil, fmt.Errorf("repository is not yet created, cannot delete key, should be retried")
 	}
 
-	var keyList v1.KeyList
+	var keyList resticv1.KeyList
 	err := kubeclient.List(ctx, &keyList, client.InNamespace(repo.Namespace))
 	if err != nil {
 		return nil, err
 	}
 
-	openKey, ok := lo.Find(keyList.Items, func(key v1.Key) bool {
+	openKey, ok := lo.Find(keyList.Items, func(key resticv1.Key) bool {
 		return lo.ContainsBy(key.OwnerReferences, func(owner metav1.OwnerReference) bool {
 			return owner.UID == repo.UID && key.Name != deletedKey.Name
 		})

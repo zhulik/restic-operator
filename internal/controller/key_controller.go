@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/go-logr/logr"
-	v1 "github.com/zhulik/restic-operator/api/v1"
+	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +66,7 @@ type KeyReconciler struct {
 func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := logf.FromContext(ctx)
 
-	key := &v1.Key{}
+	key := &resticv1.Key{}
 	err := r.Get(ctx, req.NamespacedName, key)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -117,7 +117,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               v1.KeyPending,
+			Type:               resticv1.KeyPending,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyCreationPending",
@@ -138,7 +138,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.Repository, key *v1.Key) error {
+func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) error {
 	err := r.createSecretIfNotExists(ctx, l, key)
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               v1.KeyCreating,
+			Type:               resticv1.KeyCreating,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyCreationStarted",
@@ -177,7 +177,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *v1.R
 	return nil
 }
 
-func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Key) error {
+func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
 	repo, err := r.getRepository(ctx, key)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -212,7 +212,7 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 
 	key.Status.Conditions = []metav1.Condition{
 		{
-			Type:               v1.KeyDeleting,
+			Type:               resticv1.KeyDeleting,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "KeyDeletionStarted",
@@ -230,7 +230,7 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *v1.Ke
 	return nil
 }
 
-func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logger, key *v1.Key) error {
+func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.SecretName()}, secret)
 	if err != nil {
@@ -282,29 +282,29 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 	return nil
 }
 
-func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *v1.Key) error {
+func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
 	if err != nil {
 		return err
 	}
 
-	conditionType, inCondition := conditions.ContainsAnyTrueCondition(key.Status.Conditions, v1.KeyCreating, v1.KeyDeleting)
+	conditionType, inCondition := conditions.ContainsAnyTrueCondition(key.Status.Conditions, resticv1.KeyCreating, resticv1.KeyDeleting)
 	if !inCondition {
 		return nil
 	}
 
 	switch conditionType {
-	case v1.KeyCreating:
+	case resticv1.KeyCreating:
 		return r.checkCreateJobStatus(ctx, l, key, job)
-	case v1.KeyDeleting:
+	case resticv1.KeyDeleting:
 		return r.checkDeleteJobStatus(ctx, l, key, job)
 	}
 
 	return nil
 }
 
-func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, key *v1.Key, job *batchv1.Job) error {
+func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
 	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
 	if !inCondition {
 		return nil
@@ -318,7 +318,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 	case batchv1.JobFailed:
 		key.Status.Conditions = []metav1.Condition{
 			{
-				Type:               v1.KeyFailed,
+				Type:               resticv1.KeyFailed,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: metav1.Now(),
 				Reason:             "KeyCreationJobFailed",
@@ -330,7 +330,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 	case batchv1.JobComplete:
 		key.Status.Conditions = []metav1.Condition{
 			{
-				Type:               v1.KeyCreated,
+				Type:               resticv1.KeyCreated,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: metav1.Now(),
 				Reason:             "KeyCreationJobCompleted",
@@ -346,7 +346,7 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 	return nil
 }
 
-func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *v1.Key, job *batchv1.Job) error {
+func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
 	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		switch conditionType {
 		case batchv1.JobFailed:
@@ -373,8 +373,8 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 	return nil
 }
 
-func (r *KeyReconciler) getRepository(ctx context.Context, key *v1.Key) (*v1.Repository, error) {
-	repo := &v1.Repository{}
+func (r *KeyReconciler) getRepository(ctx context.Context, key *resticv1.Key) (*resticv1.Repository, error) {
+	repo := &resticv1.Repository{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.Spec.Repository}, repo)
 	if err != nil {
 		return nil, err
@@ -385,7 +385,7 @@ func (r *KeyReconciler) getRepository(ctx context.Context, key *v1.Key) (*v1.Rep
 // SetupWithManager sets up the controller with the Manager.
 func (r *KeyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.Key{}).
+		For(&resticv1.Key{}).
 		Owns(&batchv1.Job{}).
 		Named("key").
 		Complete(r)
