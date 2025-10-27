@@ -35,10 +35,6 @@ func ContainsAnyFalseCondition(conditions []metav1.Condition, conditionTypes ...
 }
 
 func ContainsAnyConditionWithStatus(conditions []metav1.Condition, status metav1.ConditionStatus, conditionTypes ...string) (string, bool) {
-	if len(conditions) == 0 {
-		panic("conditions are unknown")
-	}
-
 	for _, condition := range conditions {
 		if slices.Contains(conditionTypes, condition.Type) && condition.Status == status {
 			return condition.Type, true

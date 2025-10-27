@@ -101,7 +101,7 @@ func (r *RepositoryReconciler) updateRepositoryStatus(ctx context.Context, repo 
 		return err
 	}
 	createdKeys := lo.Filter(keys.Items, func(key resticv1.Key, _ int) bool {
-		return key.Status.Conditions != nil && key.IsCreated()
+		return key.IsCreated()
 	})
 
 	// There is no way back from secure to not secure repository,
