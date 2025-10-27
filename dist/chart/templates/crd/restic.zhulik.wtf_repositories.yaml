@@ -26,7 +26,7 @@ spec:
       name: Repository
       type: string
     - description: created
-      jsonPath: ".status.conditions[?(@.type == 'Created\t')].status"
+      jsonPath: .status.conditions[?(@.type == 'Created')].status
       name: Created
       type: string
     - description: failed
