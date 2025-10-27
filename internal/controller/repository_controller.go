@@ -153,7 +153,7 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 	}
 
 	if err := r.Create(ctx, job); err != nil {
-		return err
+		return client.IgnoreAlreadyExists(err)
 	}
 
 	r.Recorder.Eventf(repo,

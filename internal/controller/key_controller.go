@@ -82,6 +82,11 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	if key.SetDefaultConditions() {
+		err := r.Status().Update(ctx, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 		err = ctrl.SetControllerReference(repo, key, r.Scheme)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -93,11 +98,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 		controllerutil.AddFinalizer(key, finalizer)
 		err = r.Update(ctx, key)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		err := r.Status().Update(ctx, key)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
