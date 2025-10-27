@@ -76,6 +76,10 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	repo, err := r.getRepository(ctx, key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			if !key.DeletionTimestamp.IsZero() {
+				controllerutil.RemoveFinalizer(key, finalizer)
+				return ctrl.Result{}, r.Update(ctx, key)
+			}
 			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
 		}
 		return ctrl.Result{}, err
@@ -161,18 +165,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 	return nil
 }
 
-func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
-	repo, err := r.getRepository(ctx, key)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-
-		// If the repository is not found, we consider the key already deleted
-		controllerutil.RemoveFinalizer(key, finalizer)
-		return r.Update(ctx, key)
-	}
-
+func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) error {
 	if !repo.DeletionTimestamp.IsZero() {
 		// If the repository is being deleted, we consider the key already deleted
 		controllerutil.RemoveFinalizer(key, finalizer)
