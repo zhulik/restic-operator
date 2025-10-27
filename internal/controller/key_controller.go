@@ -108,7 +108,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	key.Labels = map[string]string{
-		"restic.zhulik.wtf/repository": key.Spec.Repository,
+		labels.Repository: key.Spec.Repository,
 	}
 
 	err = r.Update(ctx, key)

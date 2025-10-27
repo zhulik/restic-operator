@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	v1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,8 +17,8 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "init-repo-",
 			Namespace:    repo.Namespace,
-			Annotations: map[string]string{
-				"restic.zhulik.wtf/repository": repo.Name,
+			Labels: map[string]string{
+				labels.Repository: repo.Name,
 			},
 		},
 
