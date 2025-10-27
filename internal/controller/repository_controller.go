@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/zhulik/restic-operator/internal/conditions"
@@ -61,7 +62,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if repo.SetDefaultConditions() {
-		return ctrl.Result{}, r.Status().Update(ctx, repo)
+		return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, r.Status().Update(ctx, repo)
 	}
 
 	if repo.IsCreated() || repo.IsFailed() {

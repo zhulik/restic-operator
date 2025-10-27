@@ -24,10 +24,8 @@ import (
 )
 
 const (
-	KeyCreating = "Creating"
-	KeyDeleting = "Deleting"
-	KeyFailed   = "Failed"
-	KeyCreated  = "Created"
+	KeyFailed  = "Failed"
+	KeyCreated = "Created"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -76,9 +74,6 @@ type KeyStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// +optional
-	ActiveJobName *string `json:"activeJobName,omitempty"`
-
-	// +optional
 	KeyID *string `json:"keyID,omitempty"`
 }
 
@@ -105,12 +100,42 @@ type Key struct {
 	Status KeyStatus `json:"status,omitempty,omitzero"`
 }
 
+func (k *Key) SetDefaultConditions() bool {
+	if k.Status.Conditions != nil {
+		return false
+	}
+
+	k.Status.Conditions = []metav1.Condition{
+		{
+			Type:               KeyCreated,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "KeyNotCreated",
+			Message:            "Key is not yet created",
+		},
+		{
+			Type:               KeyFailed,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "KeyCreationNotStarted",
+			Message:            "Key creation is not yet started",
+		},
+	}
+
+	return true
+}
+
 func (k Key) SecretName() string {
 	return fmt.Sprintf("restic-key-%s-%s", k.Spec.Repository, k.Name)
 }
 
 func (k Key) IsCreated() bool {
 	_, ok := conditions.ContainsAnyTrueCondition(k.Status.Conditions, KeyCreated)
+	return ok
+}
+
+func (k Key) IsFailed() bool {
+	_, ok := conditions.ContainsAnyTrueCondition(k.Status.Conditions, KeyFailed)
 	return ok
 }
 

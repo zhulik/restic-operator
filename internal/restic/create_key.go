@@ -54,7 +54,7 @@ func addFirstKey(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv1.Jo
 			Namespace:    repo.Namespace,
 			Labels: map[string]string{
 				labels.FirstKey:     "true",
-				labels.KeyOperation: "add",
+				labels.KeyOperation: labels.KeyOperationAdd,
 				labels.Key:          addedKey.Name,
 				labels.Repository:   repo.Name,
 			},

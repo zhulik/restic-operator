@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"time"
 
+	"github.com/samber/lo"
 	"github.com/sethvargo/go-password/password"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,6 +74,41 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	repo, err := r.getRepository(ctx, key)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
+		}
+		return ctrl.Result{}, err
+	}
+
+	if key.SetDefaultConditions() {
+		err = ctrl.SetControllerReference(repo, key, r.Scheme)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		key.Labels = map[string]string{
+			labels.Repository: key.Spec.Repository,
+		}
+
+		controllerutil.AddFinalizer(key, finalizer)
+		if err := r.Update(ctx, key); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if err := r.Status().Update(ctx, key); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		err = r.createKey(ctx, l, repo, key)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
+	}
+
 	if !key.DeletionTimestamp.IsZero() {
 		l.Info("Key is being deleted")
 
@@ -82,46 +119,22 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	if key.Status.KeyID != nil {
+	if key.IsCreated() || key.IsFailed() {
 		return ctrl.Result{}, nil
 	}
 
-	repo, err := r.getRepository(ctx, key)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
-		}
-		return ctrl.Result{}, err
-	}
-
-	if key.Status.ActiveJobName != nil {
-		err = r.checkActiveJobStatus(ctx, l, key)
-		return ctrl.Result{}, err
-	}
-
-	controllerutil.AddFinalizer(key, finalizer)
-
-	err = ctrl.SetControllerReference(repo, key, r.Scheme)
+	keyJobs, err := r.getKeyJobs(ctx, key)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	key.Labels = map[string]string{
-		labels.Repository: key.Spec.Repository,
-	}
+	finishedJobs := lo.Filter(keyJobs, func(job batchv1.Job, _ int) bool {
+		_, inCondition := conditions.JobHasAnyTrueCondition(&job, batchv1.JobComplete, batchv1.JobFailed)
+		return inCondition
+	})
 
-	err = r.Update(ctx, key)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = r.Status().Update(ctx, key)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = r.createKey(ctx, l, repo, key)
-	if err != nil {
+	if len(finishedJobs) > 0 {
+		err = r.checkActiveJobStatus(ctx, l, key, keyJobs)
 		return ctrl.Result{}, err
 	}
 
@@ -144,22 +157,6 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 	}
 
 	if err := r.Create(ctx, job); err != nil {
-		return err
-	}
-
-	key.Status.Conditions = []metav1.Condition{
-		{
-			Type:               resticv1.KeyCreating,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "KeyCreationStarted",
-			Message:            "Key creation job created",
-		},
-	}
-
-	key.Status.ActiveJobName = &job.Name
-	err = r.Status().Update(ctx, key)
-	if err != nil {
 		return err
 	}
 
@@ -199,22 +196,6 @@ func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, key *resti
 	}
 
 	// TODO: when delete key job is done, we need to update the repository conditions: unlock it and update the number of keys
-
-	key.Status.Conditions = []metav1.Condition{
-		{
-			Type:               resticv1.KeyDeleting,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "KeyDeletionStarted",
-			Message:            "Key deletion job created",
-		},
-	}
-
-	key.Status.ActiveJobName = &job.Name
-	err = r.Status().Update(ctx, key)
-	if err != nil {
-		return err
-	}
 
 	l.Info("Created key deletion job", "job", job.Name)
 	return nil
@@ -272,23 +253,15 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 	return nil
 }
 
-func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key) error {
-	job := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
-	if err != nil {
-		return err
-	}
+func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, jobs []batchv1.Job) error {
+	for _, job := range jobs {
 
-	conditionType, inCondition := conditions.ContainsAnyTrueCondition(key.Status.Conditions, resticv1.KeyCreating, resticv1.KeyDeleting)
-	if !inCondition {
-		return nil
-	}
-
-	switch conditionType {
-	case resticv1.KeyCreating:
-		return r.checkCreateJobStatus(ctx, l, key, job)
-	case resticv1.KeyDeleting:
-		return r.checkDeleteJobStatus(ctx, l, key, job)
+		switch job.Labels[labels.KeyOperation] {
+		case labels.KeyOperationAdd:
+			return r.checkCreateJobStatus(ctx, l, key, &job)
+		case labels.KeyOperationDelete:
+			return r.checkDeleteJobStatus(ctx, l, key, &job)
+		}
 	}
 
 	return nil
@@ -315,8 +288,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				Message:            logs,
 			},
 		}
-
-		key.Status.ActiveJobName = nil
 	case batchv1.JobComplete:
 		key.Status.Conditions = []metav1.Condition{
 			{
@@ -327,8 +298,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 				Message:            "Key creation job successfully completed",
 			},
 		}
-
-		key.Status.ActiveJobName = nil
 		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
 		l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
 	}
@@ -382,4 +351,16 @@ func (r *KeyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Named("key").
 		Complete(r)
+}
+
+func (r *KeyReconciler) getKeyJobs(ctx context.Context, key *resticv1.Key) ([]batchv1.Job, error) {
+	jobs := &batchv1.JobList{}
+	err := r.List(ctx, jobs, client.InNamespace(key.Namespace), client.MatchingLabels{
+		labels.Key: key.Name,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return jobs.Items, nil
 }
