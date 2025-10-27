@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/sethvargo/go-password/password"
@@ -105,9 +106,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		err = r.createKey(ctx, l, repo, key)
-		return ctrl.Result{}, err
 	}
 
 	if !key.DeletionTimestamp.IsZero() {
@@ -126,6 +124,16 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	keyJobs, err := r.getKeyJobs(ctx, key)
 	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if len(keyJobs) == 0 {
+		if !repo.IsCreated() {
+			l.Info("Repository is not yet created, will retry", "repository", repo.Name)
+			return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+		}
+
+		err = r.createKey(ctx, l, repo, key)
 		return ctrl.Result{}, err
 	}
 

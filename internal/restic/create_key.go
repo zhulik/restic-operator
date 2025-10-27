@@ -16,10 +16,6 @@ import (
 )
 
 func CreateAddKeyJob(ctx context.Context, kubeclient client.Client, repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv1.Job, error) {
-	if !repo.IsCreated() {
-		return nil, fmt.Errorf("repository is not yet created, cannot add key, should be retried")
-	}
-
 	if !repo.IsSecure() {
 		return addFirstKey(repo, addedKey)
 	}
