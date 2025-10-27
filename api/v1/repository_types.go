@@ -83,9 +83,6 @@ type RepositoryStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// +optional
-	CreateJobName *string `json:"createJobName,omitempty"`
 }
 
 // +kubebuilder:object:root=true

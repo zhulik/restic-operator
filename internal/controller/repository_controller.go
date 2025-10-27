@@ -64,22 +64,28 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	if repo.Status.CreateJobName != nil {
-		err = r.checkCreateJobStatus(ctx, l, repo)
+	job, err := r.getCreateRepoJob(ctx, repo)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	err = r.startCreateRepoJob(ctx, l, repo)
-	return ctrl.Result{}, err
-}
-
-func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository) error {
-	job := &batchv1.Job{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: *repo.Status.CreateJobName}, job)
-	if err != nil {
-		return err
+	if job == nil {
+		// Job was not found, repository does not exist yet
+		return ctrl.Result{}, r.startCreateRepoJob(ctx, l, repo)
 	}
 
+	return ctrl.Result{}, r.checkCreateJobStatus(ctx, l, repo, job)
+}
+
+func (r *RepositoryReconciler) getCreateRepoJob(ctx context.Context, repo *resticv1.Repository) (*batchv1.Job, error) {
+	job := &batchv1.Job{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Name}, job)
+	if err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return job, nil
+}
+
+func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, job *batchv1.Job) error {
 	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
 		switch conditionType {
 		case batchv1.JobFailed:
@@ -106,8 +112,6 @@ func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.
 			)
 		}
 
-		repo.Status.CreateJobName = nil
-
 		return r.Status().Update(ctx, repo)
 	}
 
@@ -121,13 +125,6 @@ func (r *RepositoryReconciler) startCreateRepoJob(ctx context.Context, l logr.Lo
 	}
 
 	if err := r.Create(ctx, job); err != nil {
-		return err
-	}
-
-	repo.Status.CreateJobName = &job.Name
-
-	err := r.Status().Update(ctx, repo)
-	if err != nil {
 		return err
 	}
 

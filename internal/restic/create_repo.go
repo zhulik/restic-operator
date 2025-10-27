@@ -15,8 +15,8 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "init-repo-",
-			Namespace:    repo.Namespace,
+			Name:      repo.Name,
+			Namespace: repo.Namespace,
 			Labels: map[string]string{
 				labels.Repository: repo.Name,
 			},
