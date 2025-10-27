@@ -74,8 +74,6 @@ spec:
           status:
             description: status defines the observed state of Key
             properties:
-              activeJobName:
-                type: string
               conditions:
                 description: |-
                   conditions represent the current state of the Key resource.
