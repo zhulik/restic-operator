@@ -337,27 +337,30 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 }
 
 func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
-	if conditionType, ok := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed); ok {
-		switch conditionType {
-		case batchv1.JobFailed:
-			// TODO: signal error through repository status
-			logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
-			if err != nil {
-				return err
-			}
+	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
+	if !inCondition {
+		return nil
+	}
 
-			l.Error(err, "Key deletion job failed", "logs", logs, "key", key.Name)
-
-			return nil
-		case batchv1.JobComplete:
-			l.Info("Key deletion successfully completed", "key", key.Name)
-			controllerutil.RemoveFinalizer(key, finalizer)
-			if err := r.Update(ctx, key); err != nil {
-				return err
-			}
-
-			return nil
+	switch conditionType {
+	case batchv1.JobFailed:
+		// TODO: signal error through repository status
+		logs, err := getJobPodLogs(ctx, r.Client, r.Config, l, job)
+		if err != nil {
+			return err
 		}
+
+		l.Error(err, "Key deletion job failed", "logs", logs, "key", key.Name)
+
+		return nil
+	case batchv1.JobComplete:
+		l.Info("Key deletion successfully completed", "key", key.Name)
+		controllerutil.RemoveFinalizer(key, finalizer)
+		if err := r.Update(ctx, key); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return nil
