@@ -92,18 +92,18 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 
 		controllerutil.AddFinalizer(key, finalizer)
-		if err := r.Update(ctx, key); err != nil {
+		err = r.Update(ctx, key)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		if err := r.Status().Update(ctx, key); err != nil {
+		err := r.Status().Update(ctx, key)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		err = r.createKey(ctx, l, repo, key)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		return ctrl.Result{}, err
 	}
 
 	if !key.DeletionTimestamp.IsZero() {
