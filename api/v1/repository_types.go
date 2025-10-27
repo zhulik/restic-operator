@@ -115,31 +115,35 @@ func (r *Repository) SetDefaults() {
 	if r.Spec.Version == "" {
 		r.Spec.Version = LatestTag
 	}
+}
 
-	if r.Status.Conditions == nil {
-		r.Status.Conditions = []metav1.Condition{
-			{
-				Type:               RepositoryCreated,
-				Status:             metav1.ConditionFalse,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryInitializing",
-				Message:            "Repository is being initialized",
-			},
-			{
-				Type:               RepositorySecure,
-				Status:             metav1.ConditionFalse,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryHasNoKeys",
-				Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
-			},
-			{
-				Type:               RepositoryFailed,
-				Status:             metav1.ConditionFalse,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryInitializationJobNotStarted",
-				Message:            "Repository initialization job has not been started yet",
-			},
-		}
+func (r *Repository) SetDefaultConditions() {
+	if r.Status.Conditions != nil {
+		return
+	}
+
+	r.Status.Conditions = []metav1.Condition{
+		{
+			Type:               RepositoryCreated,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "RepositoryInitializing",
+			Message:            "Repository is being initialized",
+		},
+		{
+			Type:               RepositorySecure,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "RepositoryHasNoKeys",
+			Message:            "Repository initialized without keys. A key needs to be added to the repository to make it secure.",
+		},
+		{
+			Type:               RepositoryFailed,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "RepositoryInitializationJobNotStarted",
+			Message:            "Repository initialization job has not been started yet",
+		},
 	}
 }
 
