@@ -24,7 +24,6 @@ import (
 )
 
 const (
-	KeyPending  = "Pending"
 	KeyCreating = "Creating"
 	KeyDeleting = "Deleting"
 	KeyFailed   = "Failed"

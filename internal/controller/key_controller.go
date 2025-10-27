@@ -115,16 +115,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	key.Status.Conditions = []metav1.Condition{
-		{
-			Type:               resticv1.KeyPending,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "KeyCreationPending",
-			Message:            "Key creation is pending. The key creation job will be created when the repository is created and unlocked from other operations.",
-		},
-	}
-
 	err = r.Status().Update(ctx, key)
 	if err != nil {
 		return ctrl.Result{}, err
