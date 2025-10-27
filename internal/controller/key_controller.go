@@ -81,7 +81,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				controllerutil.RemoveFinalizer(key, finalizer)
 				return ctrl.Result{}, r.Update(ctx, key)
 			}
-			l.Info("Repository not found, will retry", "repository", key.Spec.Repository)
+			return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 		}
 		return ctrl.Result{}, err
 	}
