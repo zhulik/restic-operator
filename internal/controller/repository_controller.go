@@ -19,7 +19,9 @@ package controller
 import (
 	"context"
 
+	"github.com/samber/lo"
 	"github.com/zhulik/restic-operator/internal/conditions"
+	"github.com/zhulik/restic-operator/internal/labels"
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,7 +65,7 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if repo.IsCreated() || repo.IsFailed() {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.updateRepositoryStatus(ctx, repo)
 	}
 
 	job, err := r.getCreateRepoJob(ctx, repo)
@@ -85,6 +87,27 @@ func (r *RepositoryReconciler) getCreateRepoJob(ctx context.Context, repo *resti
 		return nil, client.IgnoreNotFound(err)
 	}
 	return job, nil
+}
+
+func (r *RepositoryReconciler) updateRepositoryStatus(ctx context.Context, repo *resticv1.Repository) error {
+	keys := &resticv1.KeyList{}
+	err := r.List(ctx, keys, client.InNamespace(repo.Namespace), client.MatchingLabels{
+		labels.Repository: repo.Name,
+	})
+	if err != nil {
+		return err
+	}
+	createdKeys := lo.Filter(keys.Items, func(key resticv1.Key, _ int) bool {
+		return key.IsCreated()
+	})
+
+	// There is no way back from secure to not secure repository,
+	// if there are no created keys, it means none haven't been created yet
+	if len(createdKeys) == 0 {
+		return nil
+	}
+	repo.SetSecureCondition()
+	return r.Status().Update(ctx, repo)
 }
 
 func (r *RepositoryReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, job *batchv1.Job) error {
@@ -144,6 +167,7 @@ func (r *RepositoryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&resticv1.Repository{}).
 		Owns(&batchv1.Job{}).
+		Owns(&resticv1.Key{}).
 		Named("repository").
 		Complete(r)
 }

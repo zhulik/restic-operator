@@ -95,7 +95,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	if key.Status.ActiveJobName != nil {
-		err = r.checkActiveJobStatus(ctx, l, repo, key)
+		err = r.checkActiveJobStatus(ctx, l, key)
 		return ctrl.Result{}, err
 	}
 
@@ -282,7 +282,7 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 	return nil
 }
 
-func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, repo *v1.Repository, key *v1.Key) error {
+func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *v1.Key) error {
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: *key.Status.ActiveJobName}, job)
 	if err != nil {
@@ -296,7 +296,7 @@ func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger,
 
 	switch conditionType {
 	case v1.KeyCreating:
-		return r.checkCreateJobStatus(ctx, l, repo, key, job)
+		return r.checkCreateJobStatus(ctx, l, key, job)
 	case v1.KeyDeleting:
 		return r.checkDeleteJobStatus(ctx, l, key, job)
 	}
@@ -304,7 +304,7 @@ func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger,
 	return nil
 }
 
-func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *v1.Repository, key *v1.Key, job *batchv1.Job) error {
+func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, key *v1.Key, job *batchv1.Job) error {
 	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
 	if !inCondition {
 		return nil
@@ -341,18 +341,6 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 		key.Status.ActiveJobName = nil
 		key.Status.KeyID = &keyIDRegex.FindStringSubmatch(logs)[1]
 		l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
-
-		// First key was added, so we can mark the repository as secure
-		firstKey := job.Labels[labels.FirstKey] == "true"
-		if firstKey {
-			repo.Status.Conditions, _ = conditions.UpdateCondition(repo.Status.Conditions, v1.RepositorySecure, metav1.Condition{
-				Type:               v1.RepositorySecure,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "RepositoryHasAtLeastOneKey",
-				Message:            "Repository has at least one secure key",
-			})
-		}
 	}
 
 	return nil

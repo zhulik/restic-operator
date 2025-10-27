@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 
+	"github.com/zhulik/restic-operator/internal/conditions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -107,6 +108,11 @@ type Key struct {
 
 func (k Key) SecretName() string {
 	return fmt.Sprintf("restic-key-%s-%s", k.Spec.Repository, k.Name)
+}
+
+func (k Key) IsCreated() bool {
+	_, ok := conditions.ContainsAnyTrueCondition(k.Status.Conditions, KeyCreated)
+	return ok
 }
 
 // +kubebuilder:object:root=true
