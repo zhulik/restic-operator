@@ -116,9 +116,9 @@ func (r *Repository) SetDefaults() {
 	}
 }
 
-func (r *Repository) SetDefaultConditions() {
+func (r *Repository) SetDefaultConditions() bool {
 	if r.Status.Conditions != nil {
-		return
+		return false
 	}
 
 	r.Status.Conditions = []metav1.Condition{
@@ -144,6 +144,8 @@ func (r *Repository) SetDefaultConditions() {
 			Message:            "Repository creation is not yet started",
 		},
 	}
+
+	return true
 }
 
 func (r *Repository) IsCreated() bool {

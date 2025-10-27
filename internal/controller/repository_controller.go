@@ -58,7 +58,9 @@ func (r *RepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	repo.SetDefaultConditions()
+	if repo.SetDefaultConditions() {
+		return ctrl.Result{}, r.Status().Update(ctx, repo)
+	}
 
 	if repo.IsCreated() || repo.IsFailed() {
 		return ctrl.Result{}, nil
