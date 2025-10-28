@@ -38,9 +38,36 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 									Name:  "RESTIC_REPOSITORY",
 									Value: repo.Spec.Repository,
 								},
+								{
+									Name:  "RESTIC_PASSWORD_FILE",
+									Value: "/operator-key/key.txt",
+								},
 							}, repo.Spec.Env),
-							Args:            []string{"init", "--insecure-no-password"},
+							Args:            []string{"init"},
 							SecurityContext: containerSecurityContext,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "operator-key",
+									MountPath: "/operator-key",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "operator-key",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: repo.OperatorSecretName(),
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "key",
+											Path: "key.txt",
+										},
+									},
+								},
+							},
 						},
 					},
 				},

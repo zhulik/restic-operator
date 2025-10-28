@@ -90,10 +90,10 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	key := &resticv1.Key{}
-	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.Spec.Key}, key)
+	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: repo.OperatorSecretName()}, key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			l.Info("Key not found, will retry", "key", forgetSchedule.Spec.Key)
+			l.Info("Operator key not found", "key", repo.OperatorSecretName())
 		}
 		return ctrl.Result{}, err
 	}

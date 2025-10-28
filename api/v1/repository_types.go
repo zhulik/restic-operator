@@ -153,6 +153,10 @@ func (r *Repository) IsCreated() bool {
 	return ok
 }
 
+func (r *Repository) OperatorSecretName() string {
+	return fmt.Sprintf("operator-key-%s", r.Name)
+}
+
 func (r *Repository) IsSecure() bool {
 	_, ok := conditions.ContainsAnyTrueCondition(r.Status.Conditions, RepositorySecure)
 	return ok
