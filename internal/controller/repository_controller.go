@@ -195,7 +195,7 @@ func (r *RepositoryReconciler) createOperatorSecretIfNotExists(ctx context.Conte
 				Namespace: repo.Namespace,
 				Labels: map[string]string{
 					labels.KeyType:    labels.KeyTypeOperator,
-					labels.Repository: repo.Spec.Repository,
+					labels.Repository: repo.Name,
 				},
 			},
 			Type: keySecretType,
