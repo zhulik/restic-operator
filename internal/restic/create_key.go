@@ -17,10 +17,10 @@ func CreateAddKeyJob(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv
 			GenerateName: "add-key-",
 			Namespace:    repo.Namespace,
 			Labels: map[string]string{
-				labels.FirstKey:   "false",
-				labels.Key:        addedKey.Name,
-				labels.Repository: repo.Name,
-				labels.KeyType:    labels.KeyTypeOperator,
+				labels.KeyOperation: labels.KeyOperationAdd,
+				labels.Key:          addedKey.Name,
+				labels.Repository:   repo.Name,
+				labels.KeyType:      labels.KeyTypeOperator,
 			},
 		},
 		Spec: batchv1.JobSpec{
