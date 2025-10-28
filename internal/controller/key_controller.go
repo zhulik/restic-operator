@@ -108,10 +108,15 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 	}
 
+	keyJobs, err := r.getKeyJobs(ctx, key)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if !key.DeletionTimestamp.IsZero() {
 		l.Info("Key is being deleted")
 
-		err = r.deleteKey(ctx, l, repo, key)
+		err = r.deleteKey(ctx, l, repo, key, keyJobs)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -120,11 +125,6 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	if key.IsCreated() || key.IsFailed() {
 		return ctrl.Result{}, nil
-	}
-
-	keyJobs, err := r.getKeyJobs(ctx, key)
-	if err != nil {
-		return ctrl.Result{}, err
 	}
 
 	if len(keyJobs) == 0 {
@@ -173,11 +173,18 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 	return nil
 }
 
-func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key) error {
+func (r *KeyReconciler) deleteKey(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key, jobs []batchv1.Job) error {
 	if !repo.DeletionTimestamp.IsZero() {
 		// If the repository is being deleted, we consider the key already deleted
 		controllerutil.RemoveFinalizer(key, finalizer)
 		return r.Update(ctx, key)
+	}
+
+	for _, job := range jobs {
+		if job.Labels[labels.KeyOperation] == labels.KeyOperationDelete {
+			l.Info("Key deletion job already exists", "job", job.Name)
+			return nil
+		}
 	}
 
 	job, err := restic.CreateDeleteKeyJob(ctx, r.Client, repo, key)
