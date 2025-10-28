@@ -27,7 +27,6 @@ import (
 const (
 	RepositoryCreated = "Created"
 	RepositoryFailed  = "Failed"
-	RepositorySecure  = "Secure"
 )
 
 const (
@@ -90,7 +89,6 @@ type RepositoryStatus struct {
 // +kubebuilder:printcolumn:name="Repository",type=string,description="repository",JSONPath=`.spec.repository`
 // +kubebuilder:printcolumn:name="Created",type=string,description="created",JSONPath=`.status.conditions[?(@.type == 'Created')].status`
 // +kubebuilder:printcolumn:name="Failed",type=string,description="failed",JSONPath=`.status.conditions[?(@.type == 'Failed')].status`
-// +kubebuilder:printcolumn:name="Secure",type=string,description="secure",JSONPath=`.status.conditions[?(@.type == 'Secure')].status`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Repository is the Schema for the repositories API
@@ -130,13 +128,6 @@ func (r *Repository) SetDefaultConditions() bool {
 			Message:            "Repository is not yet created",
 		},
 		{
-			Type:               RepositorySecure,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "RepositoryHasNoKeys",
-			Message:            "Repository created without keys. A key needs to be added to the repository to make it secure.",
-		},
-		{
 			Type:               RepositoryFailed,
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Now(),
@@ -155,11 +146,6 @@ func (r *Repository) IsCreated() bool {
 
 func (r *Repository) OperatorSecretName() string {
 	return fmt.Sprintf("operator-key-%s", r.Name)
-}
-
-func (r *Repository) IsSecure() bool {
-	_, ok := conditions.ContainsAnyTrueCondition(r.Status.Conditions, RepositorySecure)
-	return ok
 }
 
 func (r *Repository) IsFailed() bool {
@@ -200,16 +186,6 @@ func (r *Repository) SetCreatedCondition() {
 		LastTransitionTime: metav1.Now(),
 		Reason:             "RepositoryCreated",
 		Message:            "Repository initialization job successfully completed",
-	})
-}
-
-func (r *Repository) SetSecureCondition() {
-	r.Status.Conditions, _ = conditions.UpdateCondition(r.Status.Conditions, RepositorySecure, metav1.Condition{
-		Type:               RepositorySecure,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             "RepositoryHasAtLeastOneKey",
-		Message:            "Repository has at least one key added to it",
 	})
 }
 

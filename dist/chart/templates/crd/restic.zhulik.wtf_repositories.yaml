@@ -33,10 +33,6 @@ spec:
       jsonPath: .status.conditions[?(@.type == 'Failed')].status
       name: Failed
       type: string
-    - description: secure
-      jsonPath: .status.conditions[?(@.type == 'Secure')].status
-      name: Secure
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
