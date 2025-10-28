@@ -32,7 +32,6 @@ import (
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // ForgetScheduleReconciler reconciles a ForgetSchedule object
@@ -98,30 +97,21 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	keySecret := &corev1.Secret{}
-	err = r.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: key.SecretName()}, keySecret)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			l.Info("Key secret not found, will retry", "key", key.Name)
-		}
-		return ctrl.Result{}, err
-	}
-
 	cronJob := &batchv1.CronJob{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.JobName()}, cronJob)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, r.createForgetJob(ctx, l, forgetSchedule, repo, keySecret)
+			return ctrl.Result{}, r.createForgetJob(ctx, l, forgetSchedule, repo)
 		}
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, r.updateForgetJob(ctx, l, forgetSchedule, repo, keySecret)
+	return ctrl.Result{}, r.updateForgetJob(ctx, l, forgetSchedule, repo)
 }
 
-func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
+func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) error {
 	l.Info("Creating forget job")
-	job, err := restic.CreateForgetJob(forgetSchedule, repo, keySecret)
+	job, err := restic.CreateForgetJob(forgetSchedule, repo)
 	if err != nil {
 		return err
 	}
@@ -147,9 +137,9 @@ func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.L
 	return r.Status().Update(ctx, forgetSchedule)
 }
 
-func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) error {
+func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) error {
 	l.Info("Updating forget job")
-	job, err := restic.CreateForgetJob(forgetSchedule, repo, keySecret)
+	job, err := restic.CreateForgetJob(forgetSchedule, repo)
 	if err != nil {
 		return err
 	}

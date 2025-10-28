@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository, keySecret *corev1.Secret) (*batchv1.CronJob, error) {
+func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) (*batchv1.CronJob, error) {
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      forgetSchedule.JobName(),
@@ -37,15 +37,15 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 										},
 										{
 											Name:  "RESTIC_PASSWORD_FILE",
-											Value: "/current-key/key.txt",
+											Value: "/operator-key/key.txt",
 										},
 									}),
 									Args:            forgetResticArgs(forgetSchedule),
 									SecurityContext: containerSecurityContext,
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "open-key",
-											MountPath: "/current-key",
+											Name:      "operator-key",
+											MountPath: "/operator-key",
 											ReadOnly:  true,
 										},
 									},
@@ -53,10 +53,10 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 							},
 							Volumes: []corev1.Volume{
 								{
-									Name: "open-key",
+									Name: "operator-key",
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											SecretName: keySecret.Name,
+											SecretName: repo.OperatorSecretName(),
 											Items: []corev1.KeyToPath{
 												{
 													Key:  "key",

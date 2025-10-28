@@ -143,7 +143,7 @@ func (r *KeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	})
 
 	if len(finishedJobs) > 0 {
-		err = r.checkActiveJobStatus(ctx, l, key, keyJobs)
+		err = r.checkActiveJobStatus(ctx, l, repo, key, keyJobs)
 		return ctrl.Result{}, err
 	}
 
@@ -251,21 +251,20 @@ func (r *KeyReconciler) createSecretIfNotExists(ctx context.Context, l logr.Logg
 	return nil
 }
 
-func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, jobs []batchv1.Job) error {
+func (r *KeyReconciler) checkActiveJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key, jobs []batchv1.Job) error {
 	for _, job := range jobs {
-
 		switch job.Labels[labels.KeyOperation] {
 		case labels.KeyOperationAdd:
-			return r.checkCreateJobStatus(ctx, l, key, &job)
+			return r.checkCreateJobStatus(ctx, l, repo, key, &job)
 		case labels.KeyOperationDelete:
-			return r.checkDeleteJobStatus(ctx, l, key, &job)
+			return r.checkDeleteJobStatus(ctx, l, repo, key, &job)
 		}
 	}
 
 	return nil
 }
 
-func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
+func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key, job *batchv1.Job) error {
 	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
 	if !inCondition {
 		return nil
@@ -278,15 +277,25 @@ func (r *KeyReconciler) checkCreateJobStatus(ctx context.Context, l logr.Logger,
 	switch conditionType {
 	case batchv1.JobFailed:
 		key.SetFailedCondition(logs)
+		return r.Status().Update(ctx, key)
 	case batchv1.JobComplete:
 		key.SetCreatedCondition(keyIDRegex.FindStringSubmatch(logs)[1])
 		l.Info("Key creation job completed", "keyID", *key.Status.KeyID)
+		err := r.Status().Update(ctx, key)
+		if err != nil {
+			return err
+		}
+
+		r.Recorder.Eventf(repo,
+			"Normal", "KeyAdded",
+			"Key added, id: %s", *key.Status.KeyID,
+		)
 	}
 
-	return r.Status().Update(ctx, key)
+	return nil
 }
 
-func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, key *resticv1.Key, job *batchv1.Job) error {
+func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger, repo *resticv1.Repository, key *resticv1.Key, job *batchv1.Job) error {
 	conditionType, inCondition := conditions.JobHasAnyTrueCondition(job, batchv1.JobComplete, batchv1.JobFailed)
 	if !inCondition {
 		return nil
@@ -302,6 +311,11 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 
 		l.Error(err, "Key deletion job failed", "logs", logs, "key", key.Name)
 
+		r.Recorder.Eventf(repo,
+			"Warning", "KeyDeletionFailed",
+			"Key deletion failed, id: %s", *key.Status.KeyID,
+		)
+
 		return nil
 	case batchv1.JobComplete:
 		l.Info("Key deletion successfully completed", "key", key.Name)
@@ -309,6 +323,10 @@ func (r *KeyReconciler) checkDeleteJobStatus(ctx context.Context, l logr.Logger,
 		if err := r.Update(ctx, key); err != nil {
 			return err
 		}
+		r.Recorder.Eventf(repo,
+			"Normal", "KeyDeleted",
+			"Key deleted, id: %s", *key.Status.KeyID,
+		)
 
 		return nil
 	}

@@ -36,7 +36,7 @@ func CreateAddKeyJob(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv
 							Env: slices.Concat(jobEnv(repo, addedKey), []corev1.EnvVar{
 								{
 									Name:  "RESTIC_PASSWORD_FILE",
-									Value: "/current-key/key.txt",
+									Value: "/operator-key/key.txt",
 								},
 							}),
 							Args: []string{
@@ -54,7 +54,7 @@ func CreateAddKeyJob(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv
 								},
 								{
 									Name:      "operator-key",
-									MountPath: "/current-key",
+									MountPath: "/operator-key",
 									ReadOnly:  true,
 								},
 							},
