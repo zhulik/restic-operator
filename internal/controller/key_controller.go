@@ -156,7 +156,7 @@ func (r *KeyReconciler) createKey(ctx context.Context, l logr.Logger, repo *rest
 		return err
 	}
 
-	job, err := restic.CreateAddKeyJob(ctx, r.Client, repo, key)
+	job, err := restic.CreateAddKeyJob(repo, key)
 	if err != nil {
 		return err
 	}
