@@ -88,15 +88,6 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	key := &resticv1.Key{}
-	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: repo.OperatorSecretName()}, key)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			l.Info("Operator key not found", "key", repo.OperatorSecretName())
-		}
-		return ctrl.Result{}, err
-	}
-
 	cronJob := &batchv1.CronJob{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.JobName()}, cronJob)
 	if err != nil {
