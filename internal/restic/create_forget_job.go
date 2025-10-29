@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,9 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      forgetSchedule.JobName(),
 			Namespace: forgetSchedule.Namespace,
+			Labels: map[string]string{
+				labels.Repository: repo.Name,
+			},
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          forgetSchedule.Spec.Schedule,
