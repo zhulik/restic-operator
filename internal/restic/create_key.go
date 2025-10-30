@@ -28,6 +28,7 @@ func CreateAddKeyJob(repo *resticv1.Repository, addedKey *resticv1.Key) (*batchv
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: podSecurityContext,
+					Affinity:        repo.Spec.Affinity,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",

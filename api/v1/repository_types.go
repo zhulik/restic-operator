@@ -56,6 +56,10 @@ type RepositorySpec struct {
 	// +optional
 	Env []corev1.EnvVar `json:"env"`
 
+	// Affinity is the affinity of the repository.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
 	// Version is the version of restic to use. Leave it empty to use the latest version.
 	// +optional
 	Version string `json:"version,omitempty"`
