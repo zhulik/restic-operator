@@ -1,14 +1,34 @@
 package restic
 
 import (
+	"bytes"
 	"slices"
-	"strconv"
+	"text/template"
 
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
 	"github.com/zhulik/restic-operator/internal/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	forgetJobScript = template.Must(template.New("forget").Parse(`
+	set -eu
+
+	{{ if (gt .CheckPercentage 0) }}
+	restic check --read-data-subset {{ .CheckPercentage }}
+	{{ end }}
+
+	restic forget \
+	{{ if .Prune }}--prune{{ end }} \
+	{{ if (gt .KeepLast 0) }}   --keep-last {{ .KeepLast }}{{ end }} \
+	{{ if (gt .KeepHourly 0) }} --keep-hourly {{ .KeepHourly }}{{ end }} \
+	{{ if (gt .KeepDaily 0) }}  --keep-daily {{ .KeepDaily }}{{ end }} \
+	{{ if (gt .KeepWeekly 0) }} --keep-weekly {{ .KeepWeekly }}{{ end }} \
+	{{ if (gt .KeepMonthly 0) }}--keep-monthly {{ .KeepMonthly }}{{ end }} \
+	{{ if (gt .KeepYearly 0) }} --keep-yearly {{ .KeepYearly }}{{ end }} # Yes, you must pass it=)
+	`))
 )
 
 func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) (*batchv1.CronJob, error) {
@@ -44,6 +64,7 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 											Value: "/operator-key/key.txt",
 										},
 									}),
+									Command:         []string{"/bin/sh", "-c"},
 									Args:            forgetResticArgs(forgetSchedule),
 									SecurityContext: containerSecurityContext,
 									VolumeMounts: []corev1.VolumeMount{
@@ -80,16 +101,10 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 }
 
 func forgetResticArgs(forgetSchedule *resticv1.ForgetSchedule) []string {
-	args := []string{"forget"}
-	if forgetSchedule.Spec.Prune {
-		args = append(args, "--prune")
+	var buf bytes.Buffer
+	if err := forgetJobScript.Execute(&buf, forgetSchedule.Spec); err != nil {
+		panic(err)
 	}
-	args = append(args, "--keep-last", strconv.Itoa(forgetSchedule.Spec.KeepLast))
-	args = append(args, "--keep-hourly", strconv.Itoa(forgetSchedule.Spec.KeepHourly))
-	args = append(args, "--keep-daily", strconv.Itoa(forgetSchedule.Spec.KeepDaily))
-	args = append(args, "--keep-weekly", strconv.Itoa(forgetSchedule.Spec.KeepWeekly))
-	args = append(args, "--keep-monthly", strconv.Itoa(forgetSchedule.Spec.KeepMonthly))
-	args = append(args, "--keep-yearly", strconv.Itoa(forgetSchedule.Spec.KeepYearly))
 
-	return args
+	return []string{buf.String()}
 }

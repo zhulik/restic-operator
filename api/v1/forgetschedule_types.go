@@ -47,6 +47,12 @@ type ForgetScheduleSpec struct {
 	// +optional
 	Prune bool `json:"prune,omitempty"`
 
+	// When specified, the forget cron job will also run before "forget"
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	CheckPercentage int `json:"checkPercentage,omitempty"`
+
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	KeepLast int `json:"keepLast,omitempty"`
