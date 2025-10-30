@@ -61,6 +61,12 @@ spec:
           spec:
             description: spec defines the desired state of ForgetSchedule
             properties:
+              checkPercentage:
+                description: When specified, the forget cron job will also run before
+                  "forget"
+                maximum: 100
+                minimum: 1
+                type: integer
               keepDaily:
                 minimum: 1
                 type: integer
