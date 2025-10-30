@@ -40,7 +40,7 @@ func CreateDeleteKeyJob(ctx context.Context, kubeclient client.Client, repo *res
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: podSecurityContext,
-					Affinity:        repo.Spec.Affinity,
+					NodeSelector:    repo.Spec.NodeSelector,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",

@@ -56,9 +56,9 @@ type RepositorySpec struct {
 	// +optional
 	Env []corev1.EnvVar `json:"env"`
 
-	// Affinity is the affinity of the repository.
+	// NodeSelector is the node selector of the repository, passed directly to all jobs.
 	// +optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Version is the version of restic to use. Leave it empty to use the latest version.
 	// +optional

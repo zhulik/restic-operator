@@ -49,7 +49,7 @@ func CreateForgetJob(forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Rep
 						Spec: corev1.PodSpec{
 							RestartPolicy:   corev1.RestartPolicyNever,
 							SecurityContext: podSecurityContext,
-							Affinity:        repo.Spec.Affinity,
+							NodeSelector:    repo.Spec.NodeSelector,
 							Containers: []corev1.Container{
 								{
 									Name:            "restic-init",

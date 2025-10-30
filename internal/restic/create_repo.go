@@ -28,7 +28,7 @@ func CreateRepoInitJob(repo *v1.Repository) *batchv1.Job {
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: podSecurityContext,
-					Affinity:        repo.Spec.Affinity,
+					NodeSelector:    repo.Spec.NodeSelector,
 					Containers: []corev1.Container{
 						{
 							Name:            "restic-init",
