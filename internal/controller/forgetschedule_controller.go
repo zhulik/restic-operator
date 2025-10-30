@@ -97,7 +97,7 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, r.updateForgetJob(ctx, l, forgetSchedule, repo)
+	return ctrl.Result{}, r.updateForgetJob(ctx, l, cronJob, forgetSchedule, repo)
 }
 
 func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) error {
@@ -128,16 +128,14 @@ func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.L
 	return r.Status().Update(ctx, forgetSchedule)
 }
 
-func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) error {
+func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.Logger, existingJob *batchv1.CronJob, forgetSchedule *resticv1.ForgetSchedule, repo *resticv1.Repository) error {
 	l.Info("Updating forget job")
 	job, err := restic.CreateForgetJob(forgetSchedule, repo)
 	if err != nil {
 		return err
 	}
 
-	if err := ctrl.SetControllerReference(forgetSchedule, job, r.Scheme); err != nil {
-		return err
-	}
+	existingJob.Spec = job.Spec
 
 	return r.Update(ctx, job)
 }
