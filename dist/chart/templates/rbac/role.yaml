@@ -75,19 +75,17 @@ rules:
 - apiGroups:
   - restic.zhulik.wtf
   resources:
-  - forgetschedules/finalizers
-  - keys/finalizers
-  - repositories/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - restic.zhulik.wtf
-  resources:
   - forgetschedules/status
   - keys/status
   - repositories/status
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - restic.zhulik.wtf
+  resources:
+  - keys/finalizers
+  verbs:
   - update
 {{- end -}}

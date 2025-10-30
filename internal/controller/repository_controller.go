@@ -49,7 +49,6 @@ type RepositoryReconciler struct {
 
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=repositories/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch

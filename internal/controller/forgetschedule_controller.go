@@ -44,7 +44,6 @@ type ForgetScheduleReconciler struct {
 
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=restic.zhulik.wtf,resources=forgetschedules/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -107,11 +106,13 @@ func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.L
 		return err
 	}
 
-	if err := ctrl.SetControllerReference(forgetSchedule, job, r.Scheme); err != nil {
+	err = ctrl.SetControllerReference(forgetSchedule, job, r.Scheme)
+	if err != nil {
 		return err
 	}
 
-	if err := r.Create(ctx, job); err != nil {
+	err = r.Create(ctx, job)
+	if err != nil {
 		return err
 	}
 
@@ -137,7 +138,7 @@ func (r *ForgetScheduleReconciler) updateForgetJob(ctx context.Context, l logr.L
 
 	existingJob.Spec = job.Spec
 
-	return r.Update(ctx, job)
+	return r.Update(ctx, existingJob)
 }
 
 // SetupWithManager sets up the controller with the Manager.
