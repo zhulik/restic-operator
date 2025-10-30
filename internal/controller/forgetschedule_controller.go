@@ -18,9 +18,9 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -30,6 +30,7 @@ import (
 
 	"github.com/go-logr/logr"
 	resticv1 "github.com/zhulik/restic-operator/api/v1"
+	"github.com/zhulik/restic-operator/internal/labels"
 	"github.com/zhulik/restic-operator/internal/restic"
 	batchv1 "k8s.io/api/batch/v1"
 )
@@ -64,23 +65,28 @@ func (r *ForgetScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if !forgetSchedule.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, nil
-	}
-
 	repo := &resticv1.Repository{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: forgetSchedule.Namespace, Name: forgetSchedule.Spec.Repository}, repo)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			l.Info("Repository not found, will retry", "repository", forgetSchedule.Spec.Repository)
+			return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 		}
 		return ctrl.Result{}, err
 	}
 
-	if forgetSchedule.OwnerReferences == nil {
+	if forgetSchedule.SetDefaultConditions() {
+		err = r.Status().Update(ctx, forgetSchedule)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		if err := ctrl.SetControllerReference(repo, forgetSchedule, r.Scheme); err != nil {
 			return ctrl.Result{}, err
 		}
+		forgetSchedule.Labels = map[string]string{
+			labels.Repository: forgetSchedule.Spec.Repository,
+		}
+
 		err = r.Update(ctx, forgetSchedule)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -116,15 +122,7 @@ func (r *ForgetScheduleReconciler) createForgetJob(ctx context.Context, l logr.L
 		return err
 	}
 
-	forgetSchedule.Status.Conditions = []metav1.Condition{
-		{
-			Type:               resticv1.ForgetScheduleCreated,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "ForgetScheduleCreated",
-			Message:            "Forget schedule CronJob created",
-		},
-	}
+	forgetSchedule.SetCreatedCondition()
 
 	return r.Status().Update(ctx, forgetSchedule)
 }

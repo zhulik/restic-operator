@@ -19,6 +19,7 @@ package v1
 import (
 	"fmt"
 
+	"github.com/zhulik/restic-operator/internal/conditions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -127,6 +128,34 @@ type ForgetSchedule struct {
 
 func (f *ForgetSchedule) JobName() string {
 	return fmt.Sprintf("forget-%s", f.Name)
+}
+
+func (f *ForgetSchedule) SetDefaultConditions() bool {
+	if f.Status.Conditions != nil {
+		return false
+	}
+
+	f.Status.Conditions = []metav1.Condition{
+		{
+			Type:               ForgetScheduleCreated,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "ForgetScheduleCronJobNotYeyCreated",
+			Message:            "Forget schedule CronJob is not yet created",
+		},
+	}
+
+	return true
+}
+
+func (f *ForgetSchedule) SetCreatedCondition() {
+	f.Status.Conditions, _ = conditions.UpdateCondition(f.Status.Conditions, ForgetScheduleCreated, metav1.Condition{
+		Type:               ForgetScheduleCreated,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "ForgetScheduleCronJobCreated",
+		Message:            "Forget schedule CronJob created",
+	})
 }
 
 // +kubebuilder:object:root=true
