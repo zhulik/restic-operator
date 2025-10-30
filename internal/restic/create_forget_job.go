@@ -17,7 +17,7 @@ var (
 	set -eu
 
 	{{ if (gt .CheckPercentage 0) }}
-	restic check --read-data-subset {{ .CheckPercentage }}
+	restic check --read-data-subset {{ .CheckPercentage }}%
 	{{ end }}
 
 	restic forget \
